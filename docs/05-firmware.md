@@ -12,13 +12,14 @@ Compila con 0 errores (RAM 14,7 %, flash 55,9 %). **Aún no se ha probado con el
 |---|---|---|---|
 | 1 | ESP32 DevKit | ESP32-WROOM-32, 4 MB flash, USB CH340/CP2102 | detectado en tu PC: ESP32-D0WD-V3, 4 MB, COM3 |
 | 2 | Lector NFC | PN532 (Elechouse V3 o clon rojo) | modo I2C |
-| 3 | Módulo relé | 1 canal, optoacoplador, **con jumper JD-VCC**, bobina 5 V | ver §3 si el tuyo no tiene JD-VCC |
+| 3 | Relé suelto de 5 patas | bobina **5 V DC** (p. ej. Songle SRD-05VDC-SL-C, ~70 Ω / ~70 mA), contactos ≥ 10 A 30 V DC | manejado por transistor NPN, **activo en HIGH** (§3) |
+| 3b | Transistor relé | 2N2222A / PN2222A (o BC337) | uno más aparte del del zumbador |
 | 4 | Cerradura | Solenoide 12 V DC, *fail-secure* (bloquea sin corriente) | anota su corriente (típico 0,5–1 A) |
-| 5 | Diodo | **1N4007** (≤ 1 A); **1N5408** si el solenoide pasa de 1 A | protección *flyback*, obligatorio |
+| 5 | Diodos | 2×: **1N4007** en el solenoide (**1N5408** si pasa de 1 A) + **1N4007 o 1N4148** en la bobina del relé | protección *flyback*, ambos obligatorios |
 | 6 | Fuente | 12 V DC ≥ 2 A | una sola fuente para todo |
 | 7 | Reductor | LM2596 o MP1584, 12 V → **5,0 V** | **ajustar a 5,0 V antes de conectar el ESP32** |
 | 8 | Condensadores | 1× 470–1000 µF/25 V, 1× 10 µF, 1× 100 nF | estabilidad ante picos del solenoide |
-| 9 | Resistencias | 1× 10 kΩ, 2× 330 Ω, 1× 1 kΩ | pull-up del relé, LEDs, base del transistor |
+| 9 | Resistencias | 1× 10 kΩ, 2× 330 Ω, 2× 1 kΩ | pull-down del relé, LEDs, bases de los dos transistores |
 | 10 | Interfaz | pulsador NA (salida), LED verde y rojo, zumbador activo 5 V + 2N2222, reed switch (opcional) | |
 
 ---
@@ -62,26 +63,56 @@ Junto a los pines VCC/GND del PN532: **100 nF + 10 µF** en paralelo (VCC a GND)
 
 ---
 
-## 3. ESP32 ↔ módulo relé (lado de control)
+## 3. ESP32 ↔ relé suelto con transistor NPN (lado de control)
 
-Los módulos de relé de 5 V con optoacoplador se activan con **LOW** (`RELAY_ACTIVE_LOW 1`). Alimentados a 5 V, el **HIGH de 3,3 V del ESP32 no siempre los apaga**: la cerradura podría quedar abierta. Por eso se separan las dos alimentaciones con el jumper JD-VCC.
+El GPIO **no puede** mover la bobina directamente: da 3,3 V y ~20 mA, la bobina pide 5 V y ~70 mA. Un NPN hace de interruptor del lado de masa de la bobina. Lógica **activa en HIGH**: `RELAY_ACTIVE_LOW 0` en [`config.h`](../firmware/include/config.h) (ya configurado).
 
-### Opción A (recomendada): módulo con jumper JD-VCC
-1. **Quita el jumper** que une `VCC` y `JD-VCC`.
+| GPIO 26 | Transistor | Bobina | Contacto COM–NO | Cerradura |
+|---|---|---|---|---|
+| **HIGH** (3,3 V) | conduce | activada (clic) | cerrado | **abierta** |
+| **LOW** / sin programa / reinicio | cortado | en reposo | abierto | **bloqueada** |
 
-| Pin del relé | Conectar a | Por qué |
+### 3.1 Identificar las 5 patas del relé (multímetro)
+Típico SRD-05VDC-SL-C visto desde abajo: 2 patas de bobina, COM, NO y NC. Confírmalo con el relé suelto:
+1. **Bobina:** las dos patas que marcan **~70 Ω** entre sí (≈ 55–90 Ω). No tienen polaridad propia; la fija el diodo.
+2. **COM y NC:** las dos que marcan **continuidad (0 Ω)** en reposo.
+3. **NO:** la que queda; sin continuidad con COM en reposo. Aplica 5 V a la bobina: COM–NO pasa a 0 Ω y COM–NC se abre.
+
+### 3.2 Identificar las patas del transistor
+Las marcas varían: **PN2222A** (cara plana hacia ti, patas abajo) = **E-B-C**; **P2N2222A** (ON Semi) = **C-B-E**; **BC337** = **C-B-E**. Si dudas: multímetro en modo diodo, punta roja en una pata y la negra en las otras dos. La pata que da ~0,6–0,7 V hacia **las dos** es la **base**. De las otras dos, el **emisor** marca un poco más que el colector.
+
+### 3.3 Conexiones
+
+| Desde | Hasta | Por qué |
 |---|---|---|
-| **IN** | **GPIO 26** + resistencia **10 kΩ de GPIO 26 a 3V3** | el pull-up mantiene el relé **apagado** mientras arranca el ESP32 |
-| **VCC** (bloque de 3 pines IN/VCC/GND) | **3V3 del ESP32** | alimenta solo el LED del optoacoplador |
-| **GND** (bloque IN/VCC/GND) | **GND del ESP32** | |
-| **JD-VCC** (bloque del jumper) | **5 V del reductor** | alimenta la bobina del relé |
-| **GND** (bloque del jumper, si existe) | **GND del reductor** | |
+| **GPIO 26** | resistencia **1 kΩ** → **base** del NPN | limita la corriente de base a ~2,6 mA (de sobra para saturar ~70 mA) |
+| **Base** del NPN | resistencia **10 kΩ** → **GND** | **pull-down**: mantiene el transistor cortado (relé en reposo, puerta bloqueada) mientras el ESP32 arranca, se reinicia o se programa y el GPIO queda flotando |
+| **Emisor** del NPN | **GND** (punto único de masa, §5) | |
+| **Colector** del NPN | **pata 2 de la bobina** | |
+| **Pata 1 de la bobina** | **+5 V del reductor** | **no** desde el 3V3 del ESP32 ni desde su pin 5V si está alimentado por USB |
+| Diodo **1N4007 / 1N4148** de bobina | **en paralelo con la bobina**: **franja (cátodo) → pata 1 (+5 V)**, ánodo → pata 2 (colector) | sin él, el pico de la bobina al apagar (>50 V) **destruye el transistor** en pocos ciclos |
 
-### Opción B: módulo SIN JD-VCC
-No lo conectes directo al GPIO. Pon un transistor NPN (2N2222: base ← 1 kΩ ← GPIO 26, emisor a GND, colector a IN del relé) e invierte `RELAY_ACTIVE_LOW` a `0` en `config.h`. O usa un **MOSFET lógico IRLZ44N** para el solenoide en lugar de relé: puerta ← 100 Ω ← GPIO 26, 10 kΩ de puerta a GND, drenador al − del solenoide, fuente a GND, `RELAY_ACTIVE_LOW 0`.
+```
+            +5 V (reductor)
+               │
+               ├──────────┐
+               │        ──┴──  1N4007/1N4148
+          ┌────┴────┐    ▲     franja (cátodo) arriba, hacia +5 V
+          │ BOBINA  │    │
+          │  relé   │    │
+          └────┬────┘    │
+               ├─────────┘
+               │ colector
+ GPIO 26 ──[1 kΩ]──┬── base   NPN 2N2222A
+                   │       emisor
+                [10 kΩ]       │
+                   │          │
+ GND ──────────────┴──────────┴─── punto único de masa
+```
 
-### Opción C: módulo de relé de 3,3 V
-VCC a 3V3, GND a GND, IN a GPIO 26. Comprueba en su ficha si es activo en LOW o en HIGH y ajusta `RELAY_ACTIVE_LOW`.
+> Este diodo de bobina es **adicional** al 1N4007 del solenoide (§4): uno protege el transistor, el otro el contacto del relé y la tierra.
+
+**Si en el futuro usas un módulo relé con optoacoplador** (activo en LOW): cambia `RELAY_ACTIVE_LOW` a `1`, quita el jumper JD-VCC (VCC → 3V3, JD-VCC → 5 V) y cambia el pull-down por un **pull-up de 10 kΩ de IN a 3V3**.
 
 ---
 
@@ -123,15 +154,15 @@ Añade además un **condensador de 470–1000 µF/25 V** entre +12 V y −12 V, 
           │        5V │      │ GND                           │
           │           │      ●───────── PUNTO ÚNICO DE MASA ──┘   (−12V y GND 5V unidos aquí)
           │           │      │
-          │   ESP32 VIN     ESP32 GND ── PN532 GND ── relé GND ── LEDs/botón GND
-          │   relé JD-VCC
+          │   ESP32 VIN     ESP32 GND ── PN532 GND ── emisor NPN relé ── 10 kΩ pull-down ── LEDs/botón GND
+          │   bobina relé (pata 1)
           │
      [470–1000 µF entre +12V y −12V junto al relé]
 ```
 
 - **Tierra común:** los reductores LM2596/MP1584 **no son aislados**: su `IN−` y `OUT−` son el mismo conductor. Así, el −12 V de la fuente y el GND del ESP32 ya quedan unidos. Únelos en **un solo punto** (el borne `OUT−` del reductor o el −12 V de la fuente), en estrella.
 - **La corriente del solenoide vuelve por su propio cable** directamente al −12 V. No la hagas pasar por los cables de GND del ESP32 ni del PN532: así el pico no "levanta" la tierra de la lógica.
-- **Si usas dos fuentes** (por ejemplo, cargador USB para el ESP32 y fuente de 12 V para el solenoide): con la opción A (relé optoacoplado) no es estrictamente necesario unir sus GND. Con la opción B (transistor/MOSFET) **sí lo es**: une los dos GND en un solo punto.
+- **Si usas dos fuentes** (por ejemplo, cargador USB para el ESP32 y fuente de 12 V para el solenoide): con el transistor NPN **es obligatorio unir sus GND** en un solo punto. Sin masa común, el HIGH del GPIO no tiene referencia y el relé no se activa (o lo hace de forma errática).
 - **Ajusta el reductor a 5,0 V con el multímetro ANTES de conectar el ESP32.** Los LM2596 vienen de fábrica con cualquier tensión (a veces 12 V): quemarían la placa.
 - **No alimentes el ESP32 por USB y por VIN a la vez** en la instalación final. Para programar, desconecta VIN o usa solo el USB.
 
@@ -152,12 +183,12 @@ Pines evitados a propósito: 0, 2, 5, 12, 15 (arranque) y 6–11 (flash interna)
 ### Resumen pin a pin del ESP32
 | GPIO | Función | | GPIO | Función |
 |---|---|---|---|---|
-| 21 | PN532 SDA | | 26 | Relé IN (+10 kΩ a 3V3) |
+| 21 | PN532 SDA | | 26 | 1 kΩ → base NPN del relé (10 kΩ base → GND); HIGH = abre |
 | 22 | PN532 SCL | | 27 | Pulsador de salida |
 | 4 | PN532 IRQ | | 25 | Reed switch |
 | 33 | PN532 RSTPDN (opcional) | | 18 / 19 | LED verde / rojo |
-| 3V3 | PN532 VCC, relé VCC, pull-up | | 23 | Zumbador (vía transistor) |
-| VIN | 5 V del reductor | | GND | punto único de masa |
+| 3V3 | PN532 VCC | | 23 | Zumbador (vía transistor) |
+| VIN | 5 V del reductor (el mismo que la bobina del relé) | | GND | punto único de masa |
 
 ---
 
@@ -185,7 +216,7 @@ Lista blanca sincronizada: N UIDs (heap libre ...)
 ### Orden de prueba en banco (no instales en la puerta hasta pasar los 5)
 1. **Solo ESP32 por USB**: carga y mira el log (WiFi y MQTT conectados, la puerta aparece **En línea** en el panel).
 2. **+ PN532**: debe salir `PN532 firmware 1.6`. Acerca una tarjeta: verás la alerta roja "Tarjeta no registrada" en el panel.
-3. **+ relé sin solenoide**: botón "Abrir puerta" en el panel → el relé hace clic y el LED verde se enciende 3 s.
+3. **+ relé sin solenoide**: al encender, el relé **no** debe hacer clic (pull-down OK). Botón "Abrir puerta" en el panel → clic, LED verde 3 s y continuidad COM–NO con el multímetro; al terminar, nuevo clic y COM–NO abierto. Si el relé queda activado al arrancar o nunca se activa, revisa `RELAY_ACTIVE_LOW 0` y las patas E-B-C del transistor.
 4. **+ 12 V y solenoide (con diodo)**: abrir/cerrar 20 veces seguidas sin que el ESP32 se reinicie (mira el monitor).
 5. **Offline**: registra un llavero, espera 1 min, desconecta el router: el llavero debe seguir abriendo (LED rojo destella cada 3 s = sin red).
 

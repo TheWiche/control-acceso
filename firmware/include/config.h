@@ -12,8 +12,8 @@
 #define PIN_PN532_IRQ     4   // salida IRQ del PN532 (activa en LOW)
 #define PIN_PN532_RST    33   // RSTPDN del PN532 (reset por hardware si se cuelga)
 
-#define PIN_RELAY        26   // IN del módulo relé
-#define RELAY_ACTIVE_LOW  1   // la mayoría de módulos con optoacoplador se activan con LOW
+#define PIN_RELAY        26   // base del NPN que maneja la bobina del relé (1 kΩ en serie, 10 kΩ a GND)
+#define RELAY_ACTIVE_LOW  0   // relé suelto con transistor NPN: HIGH = bobina activada. Módulo con optoacoplador: 1
 
 #define PIN_EXIT_BUTTON  27   // pulsador de salida a GND (INPUT_PULLUP). -1 si no hay
 #define PIN_DOOR_SENSOR  25   // reed switch a GND (cerrado = LOW). -1 si no hay

@@ -22,6 +22,7 @@ namespace Lock {
 
 void begin() {
   // Fija el nivel de reposo ANTES de configurar la salida: evita un "clic" del relé al arrancar.
+  // Con RELAY_ACTIVE_LOW 0 el reposo es LOW, el mismo nivel que impone el pull-down de 10 kΩ.
   digitalWrite(PIN_RELAY, RELAY_ACTIVE_LOW ? HIGH : LOW);
   pinMode(PIN_RELAY, OUTPUT);
   writeRelay(false);
