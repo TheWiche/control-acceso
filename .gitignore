@@ -1,0 +1,11 @@
+node_modules/
+.env*.local
+.DS_Store
+supabase/.temp/
+supabase/.branches/
+*.pem
+supabase/.env
+supabase/functions/.env
+firmware/include/secrets.h
+.pio/
+dist/

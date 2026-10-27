@@ -1,0 +1,57 @@
+# Fase 2 — Panel de administración (PWA)
+
+Código en [`web/`](../web/). Stack: **Vite + React + TypeScript**, CSS propio (sin framework), `react-router` con **HashRouter**, `@supabase/supabase-js`, `vite-plugin-pwa`, `lucide-react`.
+
+## Arranque
+
+```bash
+cd web
+npm install
+npm run demo                 # UI con datos simulados, sin Supabase
+cp .env.example .env.local   # rellena URL y clave publishable
+npm run dev                  # contra tu Supabase
+npm run build                # tsc + vite build -> web/dist
+```
+
+Antes de usarlo contra Supabase aplica también `supabase/migrations/20261026000400_lockdown_hold_open.sql`.
+
+## Despliegue en GitHub Pages
+1. Repo → **Settings → Pages → Source: GitHub Actions**.
+2. **Settings → Secrets and variables → Actions → Variables**: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`.
+3. Push a `main`: `.github/workflows/deploy.yml` compila con `VITE_BASE=/<repo>/` y publica. Hay que commitear `web/package-lock.json` (el workflow usa `npm ci`).
+4. En Supabase, añade `https://<usuario>.github.io/<repo>/` a *Redirect URLs*.
+
+## Estructura
+```
+web/src/
+  lib/        types.ts · api.ts (contrato) · liveApi.ts (Supabase) · demoApi.ts · format.ts
+  context/    Auth.tsx          (sesión + exige rol admin)
+  components/ DoorCard · ActivityFeed · Metrics · EnrollModal · CardEditor · Shell · ui
+  pages/      Login · Dashboard · Cards
+```
+La UI solo conoce la interfaz `Api`; `liveApi` y `demoApi` la implementan.
+
+## Qué funciona sin Edge Functions y qué no
+
+| Función | Depende de |
+|---|---|
+| Login, listas, métricas, feed en vivo, telemetría | Solo Supabase (RLS + Realtime) |
+| Activar/desactivar/editar/eliminar tarjetas, asignar personas, horarios | Solo Supabase |
+| **Abrir puerta, Bloqueo total, Mantener abierta, Modo registro** | Edge Functions (escritas en la Fase 3, ver `docs/04-invitados.md`) + firmware/`device-ingest` |
+
+## Contrato de las Edge Functions que el panel invoca
+Todas: `POST`, JWT del usuario, verifican `profiles.role = 'admin'`, responden JSON con `ok:false,error` en fallo.
+
+| Función | Body | Respuesta | Efecto |
+|---|---|---|---|
+| `unlock` | `{device_code}` | `{ok, command_id}` | `fn_authorize_member_unlock` + fila en `device_commands` + MQTT `unlock`. El ESP32 hace ACK y la fila pasa a `acked`. |
+| `device-control` | `{device_code, action, minutes?}`, `action` ∈ `lockdown_on`, `lockdown_off`, `hold_open`, `release` | `{ok}` | Actualiza `devices.lockdown` / `hold_open_until` y publica el comando MQTT. |
+| `enroll-start` | `{device_code, kind}` | `{ok, session}` (fila de `enrollment_sessions`) | Expira sesiones viejas, inserta sesión `waiting` (60 s), MQTT `enroll_start`. El ESP32 reporta la UID por HTTPS y `fn_enroll_capture` la guarda. |
+| `enroll-cancel` | `{session_id}` | `{ok}` | Sesión → `cancelled`, MQTT `enroll_cancel`. |
+
+## Decisiones de diseño
+- **Solo admin** entra al panel (los operadores no pueden crear personas por RLS). La seguridad real es RLS; la UI solo es comodidad.
+- **Horario por persona, no por tarjeta:** el esquema guarda horarios en `access_grants` (persona→puerta). El editor lo indica explícitamente.
+- Revocar con el interruptor pone la tarjeta en `suspended`; el ESP32 consulta al servidor en cada tap, así que el efecto es inmediato (en modo degradado dependería de la lista blanca sincronizada).
+- Tras enrolar se ofrece dar acceso 24 h a la puerta; sin `access_grants` una tarjeta activa igualmente sería denegada (`no_grant`).
+- Bundle ≈ 155 kB gzip. Para reducirlo, `React.lazy` por página.

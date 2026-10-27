@@ -1,0 +1,4 @@
+# Fin de línea LF en todo el repo (scripts bash, CI en Linux y firmware)
+* text=auto eol=lf
+*.png binary
+*.ico binary
