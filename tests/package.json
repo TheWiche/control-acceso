@@ -1,0 +1,13 @@
+{
+  "name": "control-acceso-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:sql": "node sql/run.mjs",
+    "test:integration": "node integration/check.mjs",
+    "test": "node integration/check.mjs && node sql/run.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.12"
+  }
+}

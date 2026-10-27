@@ -1,0 +1,32 @@
+# Compila el firmware del ESP32 en cada cambio de firmware/ (detecta errores antes de flashear).
+# Usa secrets.example.h: el binario de CI NO lleva credenciales y no se publica.
+name: Firmware CI
+
+on:
+  push:
+    paths: ['firmware/**', '.github/workflows/firmware-ci.yml']
+  pull_request:
+    paths: ['firmware/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('firmware/platformio.ini') }}
+      - run: pip install platformio
+      - run: cp include/secrets.example.h include/secrets.h
+      - run: pio run

@@ -1,0 +1,73 @@
+# Compila la PWA (web/) y la publica en GitHub Pages en cada push a main.
+# Requisitos (una sola vez):
+#   Settings → Pages → Source: "GitHub Actions"
+#   Settings → Secrets and variables → Actions → Variables:
+#     VITE_SUPABASE_URL              https://<ref>.supabase.co
+#     VITE_SUPABASE_PUBLISHABLE_KEY  sb_publishable_...   (pública por diseño; NUNCA la service_role)
+name: Deploy web (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/deploy.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Comprobar configuración
+        env:
+          URL: ${{ vars.VITE_SUPABASE_URL }}
+          KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "::error::Faltan las variables VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY (Settings → Secrets and variables → Actions → Variables)"
+            exit 1
+          fi
+          case "$KEY" in
+            *service_role*|sb_secret_*) echo "::error::Esa es una clave SECRETA. Usa la publishable."; exit 1 ;;
+          esac
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: Compilar (tsc + vite)
+        run: npm run build
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,51 @@
+# Aplica migraciones y despliega las Edge Functions. MANUAL a propósito (Actions → "Deploy Supabase" → Run):
+# un `db push` automático en cada commit es demasiado arriesgado para una base de producción.
+# Secrets (Settings → Secrets and variables → Actions → Secrets):
+#   SUPABASE_ACCESS_TOKEN   token personal ACOTADO a este proyecto
+#   SUPABASE_PROJECT_REF    <ref> del proyecto
+#   SUPABASE_DB_PASSWORD    contraseña de la base
+# Los secretos de las funciones (DEVICE_MASTER_KEY, MQTT_*, APP_ORIGIN) se configuran una vez con
+# `supabase secrets set` desde tu equipo; este flujo no los toca.
+name: Deploy Supabase
+
+on:
+  workflow_dispatch:
+    inputs:
+      migrations:
+        description: 'Aplicar migraciones (supabase db push)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Vincular proyecto
+        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Migraciones
+        if: ${{ inputs.migrations }}
+        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Edge Functions
+        run: |
+          # públicas: se autentican por su cuenta (token+PIN / clave del dispositivo). verify_jwt=false en config.toml
+          supabase functions deploy pass device-ingest --project-ref "$PROJECT_REF" --no-verify-jwt
+          # con JWT de usuario
+          supabase functions deploy pass-manage unlock device-control enroll-start enroll-cancel --project-ref "$PROJECT_REF"

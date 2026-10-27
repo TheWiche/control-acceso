@@ -1,0 +1,57 @@
+# Pruebas en cada push / PR: integración entre capas, SQL en Postgres real (PGlite),
+# type-check y pruebas de las Edge Functions (Deno) y build de la web.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration-sql:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci
+      - name: Coherencia entre SQL, Edge Functions, web y firmware
+        run: npm run test:integration
+      - name: Migraciones + reglas de negocio + RLS (PGlite)
+        run: npm run test:sql
+
+  functions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check de las Edge Functions
+        run: deno check supabase/functions/*/index.ts
+      - name: Criptografía Edge ↔ firmware ↔ aprovisionamiento
+        run: deno test --allow-read tests/functions/
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run build:demo
