@@ -1,0 +1,9 @@
+# Configuración mínima para la CLI de Supabase (link, db push, functions deploy).
+project_id = "control-acceso"
+
+# Funciones públicas: hacen su propia autenticación (token + PIN del invitado / clave derivada del ESP32).
+[functions.pass]
+verify_jwt = false
+
+[functions.device-ingest]
+verify_jwt = false
