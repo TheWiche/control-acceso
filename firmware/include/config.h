@@ -3,7 +3,7 @@
 //  Configuración de hardware y tiempos (los secretos van en secrets.h)
 // ============================================================================
 
-#define FW_VERSION "1.1.0"
+#define FW_VERSION "1.1.1"
 
 // ---------------- Pines (ESP32 DevKit / WROOM-32) ----------------
 // Evitados a propósito: 0, 2, 5, 12, 15 (strapping) y 6-11 (flash).
@@ -25,7 +25,8 @@
 // ---------------- Tiempos ----------------
 #define HEARTBEAT_MS              15000UL   // latido HTTPS (también trae la versión de la lista blanca). El servidor
                                             // marca la puerta desconectada a los 45 s sin latido
-#define STATE_REPORT_MIN_MS         300UL   // al cambiar el relé se envía un latido inmediato (máx. 1 cada 300 ms)
+#define STATE_REPORT_STABLE_MS     1000UL   // al cambiar el relé se envía un latido cuando lleva 1 s estable (no en
+                                            // el arranque del solenoide: no se suma el pico del WiFi al suyo)
 #define HOLD_MAX_S         (4UL * 3600UL)   // "mantener abierta" máximo (igual que la Edge Function)
 #define ALLOWLIST_REFRESH_MS   (6UL * 3600UL * 1000UL)  // re-sincronización forzada aunque no cambie la versión
 #define SYNC_RETRY_MS             30000UL   // reintento si la sincronización falla (no martillear el servidor)
@@ -37,6 +38,7 @@
 #define WIFI_RETRY_MS             20000UL
 #define CARD_REPEAT_MS             2500UL   // ignora la misma tarjeta dentro de este intervalo
 #define NFC_HEALTH_MS             60000UL   // comprobación periódica del PN532
+#define NFC_QUIET_MS               1500UL   // sin tocar el I2C con el relé activo ni hasta 1,5 s después (ruido del solenoide)
 #define ENROLL_WINDOW_MS          60000UL
 #define DEFAULT_UNLOCK_MS          3000UL
 #define EXIT_DEBOUNCE_MS             60UL
@@ -47,4 +49,4 @@
 #define EVENTS_MAX                  200     // eventos offline guardados (los más antiguos se descartan)
 #define EVENTS_BATCH                 20
 #define ALLOWLIST_MAX_ENTRIES       400     // coherente con HTTP_MAX_RESPONSE
-#define NFC_MAX_REINIT                 3     // reinicializaciones fallidas seguidas => reinicio del ESP32
+#define NFC_MAX_REINIT                 3     // reinicializaciones fallidas seguidas => liberación del bus I2C (nunca reinicia)

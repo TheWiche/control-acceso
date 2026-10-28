@@ -307,6 +307,8 @@ void handleRequest(const NetRequest& r) {
 uint32_t s_lastHeartbeat = 0, s_lastSync = 0, s_lastFlush = 0;
 bool     s_syncNeeded = true;
 bool     s_reportedUnlocked = false;   // estado del relé enviado en el último latido
+bool     s_relayNow = false;           // último estado visto y desde cuándo
+uint32_t s_relayChangedAt = 0;
 
 void heartbeat() {
   JsonDocument req, res;
@@ -415,8 +417,11 @@ void netTask(void*) {
 
     if (WiFi.status() != WL_CONNECTED) continue;
     uint32_t now = millis();
-    // Latido periódico, o inmediato si el relé cambió: el panel ve "Abierta/Cerrada" en tiempo real.
-    bool relayChanged = Lock::isUnlocked() != s_reportedUnlocked && msDiff(now, s_lastHeartbeat) > (int32_t)STATE_REPORT_MIN_MS;
+    // Latido periódico, o en cuanto el relé lleva 1 s en un estado nuevo: el panel ve "Abierta/Cerrada" en
+    // tiempo real sin transmitir por WiFi justo en el arranque del solenoide (dos picos de consumo a la vez).
+    bool u = Lock::isUnlocked();
+    if (u != s_relayNow) { s_relayNow = u; s_relayChangedAt = now; }
+    bool relayChanged = u != s_reportedUnlocked && msDiff(now, s_relayChangedAt) > (int32_t)STATE_REPORT_STABLE_MS;
     if (!s_lastHeartbeat || relayChanged || msDiff(now, s_lastHeartbeat) > (int32_t)HEARTBEAT_MS) { s_lastHeartbeat = now; heartbeat(); continue; }
     bool syncDue = s_syncNeeded ? (!s_lastSync || msDiff(now, s_lastSync) > (int32_t)SYNC_RETRY_MS)
                                 : msDiff(now, s_lastSync) > (int32_t)ALLOWLIST_REFRESH_MS;

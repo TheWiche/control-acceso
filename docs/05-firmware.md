@@ -241,7 +241,7 @@ Lista blanca sincronizada: N UIDs (heap libre ...)
 - **Cola offline:** hasta 200 eventos en flash. Se suben al volver la red con su hora real (`meta.offline = true`).
 - **Comandos** (`acc/v1/<code>/cmd`): `unlock`, `hold_open`, `release`, `lockdown_on/off`, `enroll_start/cancel`. Se verifican con HMAC-SHA256, ventana `iat/exp` ±30 s e id no repetido, y se confirman por HTTPS.
 - **El servidor manda:** el latido devuelve lockdown y mantener-abierta. Un comando MQTT perdido se corrige en ≤ 60 s.
-- **Recuperación:** watchdog de 30 s. El PN532 se comprueba cada 60 s; si funcionaba y deja de responder 3 veces, el ESP32 se reinicia (el relé vuelve a reposo = cerrado).
+- **Recuperación:** watchdog de 30 s. El PN532 se comprueba cada 60 s; si deja de responder, el firmware libera el bus I2C y reintenta cada 5 s. **El lector nunca reinicia el ESP32**: la cerradura y el botón de salida siguen funcionando aunque el lector falle. Mientras el solenoide actúa (y 1,5 s después) no se toca el I2C.
 
 ### Señales
 | LEDs / zumbador | Significado |

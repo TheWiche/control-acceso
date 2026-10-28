@@ -26,7 +26,8 @@ uint32_t s_seq = 0;
 bool     s_btnStable = true, s_btnLast = true;
 uint32_t s_btnChangedAt = 0;
 uint8_t  s_nfcFailures = 0;
-bool     s_nfcEverOk = false;
+bool     s_relayWasOn = false;
+uint32_t s_relayOffAt = 0;
 
 void exitButtonTick();
 
@@ -40,6 +41,24 @@ bool nfcInit() {
   nfc.setPassiveActivationRetries(0xFF);   // espera indefinida: avisa por IRQ cuando hay tarjeta
   s_armed = false;
   return true;
+}
+
+/** Libera un bus I2C colgado (el PN532 sujetando SDA tras un pico): 9 pulsos de reloj + STOP. */
+void i2cBusRecover() {
+  Wire.end();
+  pinMode(PIN_I2C_SDA, INPUT_PULLUP);
+  pinMode(PIN_I2C_SCL, OUTPUT_OPEN_DRAIN);
+  for (int i = 0; i < 9 && digitalRead(PIN_I2C_SDA) == LOW; i++) {
+    digitalWrite(PIN_I2C_SCL, LOW);  delayMicroseconds(5);
+    digitalWrite(PIN_I2C_SCL, HIGH); delayMicroseconds(5);
+  }
+  pinMode(PIN_I2C_SDA, OUTPUT_OPEN_DRAIN);
+  digitalWrite(PIN_I2C_SDA, LOW);  delayMicroseconds(5);
+  digitalWrite(PIN_I2C_SCL, HIGH); delayMicroseconds(5);
+  digitalWrite(PIN_I2C_SDA, HIGH); delayMicroseconds(5);
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  Wire.setClock(100000);
+  Wire.setTimeOut(50);
 }
 
 void arm() {
@@ -172,21 +191,26 @@ void readerTask(void*) {
     esp_task_wdt_reset();
 
     uint32_t now = millis();
+    // Mientras el solenoide actúa (y 1,5 s después) no se toca el I2C: su ruido cuelga al PN532.
+    bool relayOn = Lock::isUnlocked();
+    if (s_relayWasOn && !relayOn) s_relayOffAt = now;
+    s_relayWasOn = relayOn;
+    bool quiet = relayOn || (s_relayOffAt && msDiff(now, s_relayOffAt) < (int32_t)NFC_QUIET_MS);
+
     if (!s_nfcOk) {
-      if (!s_lastInitTry || msDiff(now, s_lastInitTry) > 5000) {
+      // El lector NUNCA reinicia el ESP32: la cerradura y el botón de salida siguen disponibles.
+      if (!quiet && (!s_lastInitTry || msDiff(now, s_lastInitTry) > 5000)) {
         s_lastInitTry = now;
         s_nfcOk = nfcInit();
-        if (s_nfcOk) { s_nfcEverOk = true; s_nfcFailures = 0; }
-        // Si el lector funcionaba y dejó de responder, el bus I2C suele quedar bloqueado: reinicio limpio.
-        // (Si nunca respondió desde el arranque es un problema de cableado: no se entra en bucle de reinicios.)
-        else if (s_nfcEverOk && ++s_nfcFailures >= NFC_MAX_REINIT) { log_e("PN532 sin recuperación: reiniciando"); delay(100); ESP.restart(); }
+        if (s_nfcOk) s_nfcFailures = 0;
+        else if (++s_nfcFailures % NFC_MAX_REINIT == 0) { log_w("PN532 sin respuesta: liberando el bus I2C"); i2cBusRecover(); }
       }
       vTaskDelay(pdMS_TO_TICKS(20));
       continue;
     }
 
     // Salud del PN532: los módulos I2C pueden colgarse con ruido eléctrico del solenoide.
-    if (msDiff(now, s_lastHealth) > (int32_t)NFC_HEALTH_MS && !Lock::isUnlocked()) {
+    if (msDiff(now, s_lastHealth) > (int32_t)NFC_HEALTH_MS && !quiet) {
       s_lastHealth = now;
       if (!nfc.getFirmwareVersion()) { log_w("PN532 colgado: reinicializando"); s_nfcOk = false; continue; }
       s_armed = false;   // el comando de prueba cancela la detección en curso
