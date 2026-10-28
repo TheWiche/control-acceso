@@ -3,7 +3,7 @@
 //   api_key = HMAC-SHA256(DEVICE_MASTER_KEY, "api|<code>|<key_version>")  — se calcula aquí, nunca se guarda.
 //
 // Tipos (campo "type" del JSON):
-//   heartbeat  {ip, rssi, lock_state, door_closed, fw, uptime, heap, mqtt}
+//   heartbeat  {ip, rssi, lock_state, door_closed, fw, uptime, heap, mqtt, reset}
 //   access     {uid}                         -> decisión online (autoritativa)
 //   enroll_read{session_id, uid}
 //   ack        {command_id, ok, error?}
@@ -52,6 +52,7 @@ Deno.serve(handler(async (req, body) => {
         p_door_closed: typeof body.door_closed === 'boolean' ? body.door_closed : null,
         p_firmware: str(body.fw, 32), p_uptime: num(body.uptime), p_free_heap: num(body.heap),
         p_mqtt: typeof body.mqtt === 'boolean' ? body.mqtt : null,
+        p_reset_reason: typeof body.reset === 'string' && /^[a-z_]{1,24}$/.test(body.reset) ? body.reset : null,
       });
       const version = await rpc('fn_device_allowlist_version', { p_device_code: code });
       return { ...hb, allowlist_version: version };

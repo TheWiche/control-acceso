@@ -52,7 +52,8 @@ export interface Api {
 
   unlock(deviceCode: string): Promise<{ commandId: string }>;
   waitCommand(commandId: string, timeoutMs: number): Promise<CommandStatus>;
-  deviceControl(deviceCode: string, action: DeviceAction, minutes?: number): Promise<void>;
+  /** `seconds`: duración de hold_open. `delivered` = el broker aceptó el comando (si no, lo aplica el próximo latido). */
+  deviceControl(deviceCode: string, action: DeviceAction, seconds?: number): Promise<{ delivered: boolean }>;
 
   enrollStart(deviceCode: string, kind: CredentialKind): Promise<EnrollmentSession>;
   enrollCancel(sessionId: string): Promise<void>;

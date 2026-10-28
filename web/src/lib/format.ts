@@ -19,8 +19,23 @@ export const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('es', {
 
 export function mmss(ms: number): string {
   const t = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = String(t % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
 }
+
+/** 90 -> "1 min 30 s", 7200 -> "2 h" */
+export function fmtDuration(sec: number): string {
+  if (sec < 60) return `${sec} s`;
+  if (sec < 3600) { const m = Math.floor(sec / 60), s = sec % 60; return s ? `${m} min ${s} s` : `${m} min`; }
+  const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+/** Motivo del último arranque del ESP32 (device_state.last_reset_reason). */
+export const RESET_LABELS: Record<string, string> = {
+  power_on: 'encendido normal', brownout: 'caída de tensión', watchdog: 'bloqueo (watchdog)', panic: 'fallo del firmware',
+  software: 'reinicio por software', external: 'botón de reset', deep_sleep: 'suspensión', other: 'otro motivo',
+};
 
 /** 04A1B2C3 -> 04:A1:B2:C3 */
 export const fmtUid = (uid: string) => uid.match(/.{1,2}/g)?.join(':') ?? uid;

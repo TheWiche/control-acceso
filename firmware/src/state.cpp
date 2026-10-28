@@ -1,5 +1,21 @@
 #include "state.h"
+#include <esp_system.h>
 #include "config.h"
+
+const char* resetReasonName() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON:   return "power_on";
+    case ESP_RST_BROWNOUT:  return "brownout";   // la alimentación cayó (típico: fuente débil al activar el solenoide)
+    case ESP_RST_INT_WDT:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_WDT:       return "watchdog";
+    case ESP_RST_PANIC:     return "panic";
+    case ESP_RST_SW:        return "software";
+    case ESP_RST_EXT:       return "external";
+    case ESP_RST_DEEPSLEEP: return "deep_sleep";
+    default:                return "other";
+  }
+}
 
 QueueHandle_t g_netQueue = nullptr;
 QueueHandle_t g_accessResp = nullptr;

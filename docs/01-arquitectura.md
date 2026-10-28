@@ -11,7 +11,7 @@ ESP32 + PN532 + solenoide · PWA en GitHub Pages · Supabase · MQTT
 | 3 | **El motor de decisión es SQL** (`fn_authorize_*`), invocado solo por Edge Functions con `service_role`. | Validar + consumir un uso + escribir el log ocurre en **una transacción**: no hay carreras (dos taps no superan `max_uses`). |
 | 4 | **Claves de dispositivo derivadas, no almacenadas:** `HMAC(MASTER_KEY, "api\|cmd" + device_code + key_version)`. `MASTER_KEY` es un secreto de Edge Functions, no está en la base. | Una filtración de la base de datos no entrega claves de cerraduras. Rotar = subir `key_version`. |
 | 5 | **Comandos MQTT firmados** (HMAC + `exp` de 10 s + id único). | No dependemos de ACL por tópico del broker gratuito; aunque alguien publique en el broker, el ESP32 rechaza lo que no esté firmado y vigente. |
-| 6 | **Presencia por latido HTTPS + `pg_cron`**, no por MQTT LWT. | Supabase no ve el LWT del broker. El latido (60 s) marca online; un cron cada minuto marca offline tras 90 s y Realtime avisa al panel. |
+| 6 | **Presencia por latido HTTPS + `pg_cron`**, no por MQTT LWT. | Supabase no ve el LWT del broker. El latido (15 s, e inmediato al cambiar el relé) marca online; un cron cada 15 s marca offline tras 45 s sin latido; Realtime avisa al panel. |
 | 7 | **Hash de PIN con bcrypt + bloqueo, token de pase con 128 bits y en el fragmento `#` de la URL.** | El fragmento no se envía al servidor de GitHub Pages ni va en `Referer`; el PIN se comparte por otro mensaje. |
 
 ## 2. Componentes

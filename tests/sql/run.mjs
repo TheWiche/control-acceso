@@ -159,6 +159,15 @@ const p4 = await mk();
 r = await redeem(p4.token, p4.pin); check('lockdown niega pase', r.reason === 'lockdown', r);
 const hb = await as('service_role', null, async () => (await q(`select public.fn_device_heartbeat('door001') r`))[0].r);
 check('heartbeat informa lockdown', hb.lockdown === true && hb.hold_open_until === null, hb);
+
+// ---- motivo de reinicio (migración presence_reset_reason) ----
+const resetOf = async () => (await q(`select last_reset_reason r from device_state where device_id='${d1.id}'`))[0].r;
+await as('service_role', null, () => q(`select public.fn_device_heartbeat('door001', p_reset_reason => 'brownout')`));
+check('heartbeat guarda motivo de reinicio', (await resetOf()) === 'brownout');
+await as('service_role', null, () => q(`select public.fn_device_heartbeat('door001', p_reset_reason => 'X; drop')`));
+check('motivo inválido no sobrescribe', (await resetOf()) === 'brownout');
+await as('service_role', null, () => q(`select public.fn_device_heartbeat('door001')`));
+check('latido sin motivo conserva el último', (await resetOf()) === 'brownout');
 await db.exec(`update devices set lockdown=false where id='${d1.id}'`);
 r = await redeem(p4.token, p4.pin); check('sin lockdown, pase abre', r.granted === true, r);
 

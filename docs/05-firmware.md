@@ -225,18 +225,19 @@ Lista blanca sincronizada: N UIDs (heap libre ...)
 ## 8. Diseño del firmware
 
 ```
+ Núcleo 1 — "io" (prio 4): relé, LEDs, zumbador y botón de salida cada 10 ms (nada la bloquea)
  Núcleo 1 — "reader" (prio 3)                     Núcleo 0 — "net" (prio 2)
  PN532 por IRQ (no bloquea)                        WiFi no bloqueante + reintento cada 20 s
  anti-rebote de la misma tarjeta (2,5 s)           esp-mqtt: tarea propia, TLS, reconexión sola, LWT
  ¿modo registro? → envía UID a la web              HTTPS persistente a device-ingest (bundle de CAs)
  ¿online? → pregunta al servidor (≤ 2,5 s)  ───►   access / enroll_read / ack / heartbeat / allowlist / events
  si no hay respuesta → decide la CACHÉ             comandos MQTT firmados → HMAC, exp, anti-replay
- relé + LEDs + zumbador + botón de salida          latido 60 s: hora, lockdown, hold-open, versión de lista
+                                                  latido 15 s (y al cambiar el relé): hora, lockdown, hold-open, versión de lista, motivo del último reinicio
  watchdog 30 s                                     sube la cola offline cada 15 s
 ```
 
 - **Decisión de acceso:** con red, decide el servidor (revocación instantánea, log en vivo). Si no responde en 2,5 s o no hay red, decide la caché. Mientras espera, el relé, los LEDs y el botón de salida siguen respondiendo.
-- **Caché offline (LittleFS):** hasta **400 UIDs** con vigencia, días, ventana horaria y desfase horario del sitio. Se escribe de forma atómica (`.tmp` + `rename`) y se re-sincroniza cuando cambia la huella que trae el latido: una revocación llega a la caché en ≤ 60 s.
+- **Caché offline (LittleFS):** hasta **400 UIDs** con vigencia, días, ventana horaria y desfase horario del sitio. Se escribe de forma atómica (`.tmp` + `rename`) y se re-sincroniza cuando cambia la huella que trae el latido: una revocación llega a la caché en ≤ 15 s.
 - **Cola offline:** hasta 200 eventos en flash. Se suben al volver la red con su hora real (`meta.offline = true`).
 - **Comandos** (`acc/v1/<code>/cmd`): `unlock`, `hold_open`, `release`, `lockdown_on/off`, `enroll_start/cancel`. Se verifican con HMAC-SHA256, ventana `iat/exp` ±30 s e id no repetido, y se confirman por HTTPS.
 - **El servidor manda:** el latido devuelve lockdown y mantener-abierta. Un comando MQTT perdido se corrige en ≤ 60 s.

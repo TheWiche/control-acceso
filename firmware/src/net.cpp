@@ -239,8 +239,13 @@ void handleCommand(const MqttMsg& m) {
     Lock::pulse(ms ? ms : Lock::defaultUnlockMs());
     Feedback::signal(Feedback::Granted);
   } else if (cmd == "hold_open") {
-    uint32_t minutes = constrain(strtoul(arg, nullptr, 10), 1UL, 240UL);
-    Lock::holdOpenUntil(nowEpoch() + minutes * 60);
+    // arg = hora absoluta de cierre (epoch, s), la misma que guarda la base. Un número pequeño son
+    // minutos (formato del servidor anterior). Nunca más de HOLD_MAX_S desde ahora.
+    uint32_t v = strtoul(arg, nullptr, 10), now = nowEpoch();
+    uint32_t until = v >= 1000000000UL ? v : now + constrain(v, 1UL, 240UL) * 60;
+    if (until > now + HOLD_MAX_S) until = now + HOLD_MAX_S;
+    if (until > now) Lock::holdOpenUntil(until);
+    else ok = false;
   } else if (cmd == "release") {
     Lock::holdOpenUntil(0);
   } else if (cmd == "lockdown_on") {
@@ -255,7 +260,7 @@ void handleCommand(const MqttMsg& m) {
   } else {
     ok = false;
   }
-  ack(id, ok, ok ? nullptr : "comando desconocido");
+  ack(id, ok, ok ? nullptr : "comando desconocido o fuera de plazo");
 }
 
 // ============================================================================
@@ -301,15 +306,18 @@ void handleRequest(const NetRequest& r) {
 // ============================================================================
 uint32_t s_lastHeartbeat = 0, s_lastSync = 0, s_lastFlush = 0;
 bool     s_syncNeeded = true;
+bool     s_reportedUnlocked = false;   // estado del relé enviado en el último latido
 
 void heartbeat() {
   JsonDocument req, res;
   bool known;
   bool closed = Lock::doorClosed(&known);
+  s_reportedUnlocked = Lock::isUnlocked();
   req["type"] = "heartbeat";
   req["ip"] = WiFi.localIP().toString();
   req["rssi"] = WiFi.RSSI();
-  req["lock_state"] = Lock::isUnlocked() ? "unlocked" : "locked";
+  req["lock_state"] = s_reportedUnlocked ? "unlocked" : "locked";
+  req["reset"] = resetReasonName();
   if (known) req["door_closed"] = closed;
   req["fw"] = FW_VERSION;
   req["uptime"] = (uint32_t)(millis() / 1000);
@@ -407,7 +415,9 @@ void netTask(void*) {
 
     if (WiFi.status() != WL_CONNECTED) continue;
     uint32_t now = millis();
-    if (!s_lastHeartbeat || msDiff(now, s_lastHeartbeat) > (int32_t)HEARTBEAT_MS) { s_lastHeartbeat = now; heartbeat(); continue; }
+    // Latido periódico, o inmediato si el relé cambió: el panel ve "Abierta/Cerrada" en tiempo real.
+    bool relayChanged = Lock::isUnlocked() != s_reportedUnlocked && msDiff(now, s_lastHeartbeat) > (int32_t)STATE_REPORT_MIN_MS;
+    if (!s_lastHeartbeat || relayChanged || msDiff(now, s_lastHeartbeat) > (int32_t)HEARTBEAT_MS) { s_lastHeartbeat = now; heartbeat(); continue; }
     bool syncDue = s_syncNeeded ? (!s_lastSync || msDiff(now, s_lastSync) > (int32_t)SYNC_RETRY_MS)
                                 : msDiff(now, s_lastSync) > (int32_t)ALLOWLIST_REFRESH_MS;
     if (syncDue) { s_lastSync = now; syncAllowlist(); continue; }

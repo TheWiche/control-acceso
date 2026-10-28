@@ -249,8 +249,9 @@ export const liveApi: Api = {
     });
   },
 
-  async deviceControl(deviceCode, action, minutes) {
-    await call('device-control', { device_code: deviceCode, action, minutes });
+  async deviceControl(deviceCode, action, seconds) {
+    const r = await call<{ delivered?: boolean }>('device-control', { device_code: deviceCode, action, seconds });
+    return { delivered: r.delivered !== false };
   },
 
   async enrollStart(deviceCode, kind) {

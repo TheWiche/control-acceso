@@ -47,5 +47,8 @@ inline uint32_t nowEpoch() { return (uint32_t)time(nullptr); }
 /** a - b para millis() tolerante al desbordamiento. */
 inline int32_t msDiff(uint32_t a, uint32_t b) { return (int32_t)(a - b); }
 
+/** Motivo del último arranque: power_on, brownout, watchdog, panic, software, external, deep_sleep, other. */
+const char* resetReasonName();
+
 void bytesToHex(const uint8_t* in, size_t len, char* out);   // out >= 2*len+1
 size_t hexToBytes(const char* hex, uint8_t* out, size_t max);

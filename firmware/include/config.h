@@ -3,7 +3,7 @@
 //  Configuración de hardware y tiempos (los secretos van en secrets.h)
 // ============================================================================
 
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.1.0"
 
 // ---------------- Pines (ESP32 DevKit / WROOM-32) ----------------
 // Evitados a propósito: 0, 2, 5, 12, 15 (strapping) y 6-11 (flash).
@@ -23,7 +23,10 @@
 #define PIN_BUZZER       23   // zumbador ACTIVO vía transistor. -1 si no hay
 
 // ---------------- Tiempos ----------------
-#define HEARTBEAT_MS              60000UL   // latido HTTPS (también trae la versión de la lista blanca)
+#define HEARTBEAT_MS              15000UL   // latido HTTPS (también trae la versión de la lista blanca). El servidor
+                                            // marca la puerta desconectada a los 45 s sin latido
+#define STATE_REPORT_MIN_MS         300UL   // al cambiar el relé se envía un latido inmediato (máx. 1 cada 300 ms)
+#define HOLD_MAX_S         (4UL * 3600UL)   // "mantener abierta" máximo (igual que la Edge Function)
 #define ALLOWLIST_REFRESH_MS   (6UL * 3600UL * 1000UL)  // re-sincronización forzada aunque no cambie la versión
 #define SYNC_RETRY_MS             30000UL   // reintento si la sincronización falla (no martillear el servidor)
 #define EVENTS_FLUSH_MS           15000UL   // subida de la cola offline

@@ -27,6 +27,7 @@ export interface DeviceState {
   door_closed: boolean | null;
   firmware_version: string | null;
   uptime_seconds: number | null;
+  last_reset_reason: string | null;
   enroll_mode_until: string | null;
 }
 

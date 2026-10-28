@@ -27,12 +27,12 @@ const devices: DeviceView[] = [
   {
     id: 'd1', device_code: 'puerta01x', name: 'Puerta principal', location: 'Entrada · Planta baja', unlock_ms: 3000,
     is_active: true, lockdown: false, hold_open_until: null,
-    state: { device_id: 'd1', is_online: true, last_seen_at: ago(4), ip_address: '192.168.1.42', rssi: -58, lock_state: 'locked', door_closed: true, firmware_version: '0.4.1', uptime_seconds: 188_000, enroll_mode_until: null },
+    state: { device_id: 'd1', is_online: true, last_seen_at: ago(4), ip_address: '192.168.1.42', rssi: -58, lock_state: 'locked', door_closed: true, firmware_version: '0.4.1', uptime_seconds: 188_000, last_reset_reason: 'power_on', enroll_mode_until: null },
   },
   {
     id: 'd2', device_code: 'bodega02y', name: 'Bodega', location: 'Sótano', unlock_ms: 4000,
     is_active: true, lockdown: false, hold_open_until: null,
-    state: { device_id: 'd2', is_online: false, last_seen_at: ago(1260), ip_address: '192.168.1.57', rssi: -81, lock_state: 'locked', door_closed: true, firmware_version: '0.4.1', uptime_seconds: null, enroll_mode_until: null },
+    state: { device_id: 'd2', is_online: false, last_seen_at: ago(1260), ip_address: '192.168.1.57', rssi: -81, lock_state: 'locked', door_closed: true, firmware_version: '0.4.1', uptime_seconds: null, last_reset_reason: null, enroll_mode_until: null },
   },
 ];
 
@@ -240,15 +240,19 @@ export const demoApi: Api = {
     }
     return 'expired';
   },
-  async deviceControl(deviceCode, action, minutes) {
+  async deviceControl(deviceCode, action, seconds) {
     const d = devices.find((x) => x.device_code === deviceCode);
     await wait(400);
     if (!d) throw new Error('Dispositivo desconocido');
-    if (!d.state.is_online) throw new Error('El dispositivo está desconectado');
-    if (action === 'lockdown_on') patchDevice(d.id, { lockdown: true });
+    if (action === 'lockdown_on') patchDevice(d.id, { lockdown: true, hold_open_until: null });
     if (action === 'lockdown_off') patchDevice(d.id, { lockdown: false });
-    if (action === 'hold_open') patchDevice(d.id, { hold_open_until: new Date(Date.now() + (minutes ?? 5) * 60_000).toISOString() });
+    if (action === 'hold_open') {
+      if (d.lockdown) throw new Error('Quita primero el bloqueo total');
+      if (!d.state.is_online) throw new Error('La cerradura está desconectada');
+      patchDevice(d.id, { hold_open_until: new Date(Date.now() + (seconds ?? 300) * 1000).toISOString() });
+    }
     if (action === 'release') patchDevice(d.id, { hold_open_until: null });
+    return { delivered: d.state.is_online };
   },
 
   async enrollStart(deviceCode, kind: CredentialKind) {

@@ -21,22 +21,32 @@ export async function sendCommand(db: SupabaseClient, dev: DeviceRef, type: CmdT
   const iat = Math.floor(Date.now() / 1000);
   const body: CommandBody = { v: 1, id: crypto.randomUUID(), cmd: type, arg: String(opts.arg ?? ''), iat, exp: iat + ttl };
 
-  const { error: insErr } = await db.from('device_commands').insert({
-    id: body.id, device_id: dev.id, type, payload: { arg: body.arg },
-    issued_by: opts.issuedBy ?? null, access_log_id: opts.accessLogId ?? null,
-    expires_at: new Date((iat + ttl) * 1000).toISOString(),
-  });
-  if (insErr) throw insErr;
+  // La conexión TLS + MQTT al broker es lo más lento: se abre en paralelo con la fila y la firma.
+  const connecting = mqtt.connectAsync(Deno.env.get('MQTT_URL')!, {
+    username: Deno.env.get('MQTT_USERNAME'), password: Deno.env.get('MQTT_PASSWORD'),
+    clientId: `edge-${crypto.randomUUID().slice(0, 8)}`, connectTimeout: 5000, reconnectPeriod: 0, clean: true,
+    forceNativeWebSocket: true,   // WebSocket nativo de Deno (no depende del paquete `ws` de Node)
+  }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
 
-  const signed = await signCommand(await deriveCmdKey(master, dev.device_code, dev.key_version), body);
+  const [{ error: insErr }, signed] = await Promise.all([
+    db.from('device_commands').insert({
+      id: body.id, device_id: dev.id, type, payload: { arg: body.arg },
+      issued_by: opts.issuedBy ?? null, access_log_id: opts.accessLogId ?? null,
+      expires_at: new Date((iat + ttl) * 1000).toISOString(),
+    }),
+    deriveCmdKey(master, dev.device_code, dev.key_version).then((k) => signCommand(k, body)),
+  ]);
+  if (insErr) {
+    const c = await connecting;
+    if (!(c instanceof Error)) await c.endAsync(true).catch(() => {});
+    throw insErr;
+  }
 
   let client: mqtt.MqttClient | null = null;
   try {
-    client = await mqtt.connectAsync(Deno.env.get('MQTT_URL')!, {
-      username: Deno.env.get('MQTT_USERNAME'), password: Deno.env.get('MQTT_PASSWORD'),
-      clientId: `edge-${crypto.randomUUID().slice(0, 8)}`, connectTimeout: 5000, reconnectPeriod: 0, clean: true,
-      forceNativeWebSocket: true,   // WebSocket nativo de Deno (no depende del paquete `ws` de Node)
-    });
+    const c = await connecting;
+    if (c instanceof Error) throw c;
+    client = c;
     await client.publishAsync(`acc/v1/${dev.device_code}/cmd`, JSON.stringify(signed), { qos: 1, retain: false });
     // Solo si sigue 'pending': el ACK del ESP32 puede llegar ANTES que esta línea y no debe pisarse.
     await db.from('device_commands').update({ status: 'sent', sent_at: new Date().toISOString() })

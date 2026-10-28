@@ -6,6 +6,7 @@
 // ============================================================================
 #include <Arduino.h>
 #include <esp_idf_version.h>
+#include <esp_system.h>
 #include <esp_task_wdt.h>
 #include "cache.h"
 #include "config.h"
@@ -25,6 +26,8 @@ void ioTask(void*);
 void setup() {
   Serial.begin(115200);
   log_i("Control de Acceso %s — dispositivo %s", FW_VERSION, DEVICE_CODE);
+  if (esp_reset_reason() == ESP_RST_BROWNOUT) log_e("Arranque tras BROWNOUT: la alimentación de 5 V cayó (revisa la fuente)");
+  else log_i("Motivo del arranque: %s", resetReasonName());
 
   Lock::begin();        // primero: relé en reposo (cerrado) cuanto antes
   Feedback::begin();
