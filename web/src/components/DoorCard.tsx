@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { DoorOpen, Lock, LockOpen, ShieldAlert, Timer, Wifi, WifiOff, X } from 'lucide-react';
+import { DoorOpen, ShieldAlert, Timer } from 'lucide-react';
 import { api } from '../lib';
 import type { DeviceAction, DeviceView } from '../lib/types';
 import { fmtDuration, mmss, RESET_LABELS, rssiBars, timeAgo } from '../lib/format';
-import { ConfirmModal, Modal, Segmented, SignalBars, Spinner, useNow, useToast } from './ui';
+import { ConfirmModal, Modal, Segmented, SignalBars, SlideToUnlock, Spinner, useNow, useToast, type SlideState } from './ui';
 
 type Phase = 'idle' | 'sending' | 'waiting' | 'open' | 'error';
 type Unit = 's' | 'min' | 'h';
@@ -28,6 +28,7 @@ export function DoorCard({ device, onChanged }: { device: DeviceView; onChanged:
   const [pending, setPending] = useState<DeviceAction | null>(null);   // orden de control en curso
   const [confirmLockdown, setConfirmLockdown] = useState(false);
   const [holdOpen, setHoldOpen] = useState(false);
+  const [openedAt, setOpenedAt] = useState(0);                         // inicio de la cuenta regresiva del solenoide
   const resetTimer = useRef<number>(0);
   useEffect(() => () => window.clearTimeout(resetTimer.current), []);
 
@@ -52,7 +53,7 @@ export function DoorCard({ device, onChanged }: { device: DeviceView; onChanged:
       setPhase('waiting'); setPhaseMsg('Esperando a la cerradura…');
       const st = await api.waitCommand(commandId, 9000);
       if (st === 'acked') {
-        setPhase('open'); setPhaseMsg('Puerta abierta');
+        setPhase('open'); setPhaseMsg('Puerta abierta'); setOpenedAt(Date.now());
         resetTimer.current = window.setTimeout(() => setPhase('idle'), device.unlock_ms + 400);
       } else {
         setPhase('error'); setPhaseMsg(st === 'failed' ? 'La cerradura reportó un fallo' : 'La puerta no respondió');
@@ -77,13 +78,19 @@ export function DoorCard({ device, onChanged }: { device: DeviceView; onChanged:
     } finally { setPending(null); }
   }
 
+  const verifying = phase === 'sending' || phase === 'waiting';
+  const stage: 'locked' | 'verifying' | 'unlocked' = verifying ? 'verifying' : isOpen ? 'unlocked' : 'locked';
+  const slideState: SlideState = verifying ? 'verifying' : isOpen ? 'unlocked' : phase === 'error' ? 'error' : 'idle';
+  // Cuenta regresiva solo cuando la apertura la lanzó esta pantalla: sabemos desde cuándo corre el solenoide.
+  const countdownMs = phase === 'open' && openedAt ? Math.max(0, device.unlock_ms - (now - openedAt)) : 0;
+
   const label =
     pending ? PENDING_LABELS[pending]
-    : phase === 'sending' || phase === 'waiting' || phase === 'error' ? phaseMsg
-    : holding ? `Puerta liberada · se cierra en ${mmss(holdUntil - now)}`
-    : isOpen ? 'Puerta abierta'
+    : verifying || phase === 'error' ? phaseMsg
+    : holding ? `Liberada · ${mmss(holdUntil - now)}`
+    : isOpen ? 'Desbloqueada'
     : !online ? 'Cerradura sin conexión'
-    : device.lockdown ? 'Abrir (admin)' : 'Abrir puerta';
+    : device.lockdown ? 'Desliza · abrir como admin' : 'Desliza para abrir';
 
   const holdBlockedWhy = device.lockdown ? 'Quita primero el bloqueo total' : !online ? 'La cerradura está desconectada' : undefined;
 
@@ -94,9 +101,11 @@ export function DoorCard({ device, onChanged }: { device: DeviceView; onChanged:
           <h3>{device.name}</h3>
           <p className="muted small">{device.location ?? device.device_code}</p>
         </div>
-        <span className={`pill ${online ? 'pill-ok' : 'pill-off'}`}>
-          {online ? <Wifi size={14} aria-hidden /> : <WifiOff size={14} aria-hidden />}
-          {online ? 'En línea' : 'Desconectado'}
+        <span className={`link-badge ${online ? 'on' : ''}`} title={online ? 'ESP32 en línea' : 'ESP32 sin conexión'}>
+          <i className="link-dot" aria-hidden />
+          {online
+            ? <><b>En línea</b><SignalBars bars={bars} />{s.rssi != null ? `${s.rssi} dBm` : ''}<span>· {s.last_seen_at ? `${Math.max(0, Math.round((now - lastSeen) / 1000))} s` : '—'}</span></>
+            : <b>Sin conexión</b>}
         </span>
       </header>
 
@@ -116,20 +125,19 @@ export function DoorCard({ device, onChanged }: { device: DeviceView; onChanged:
         </div>
       )}
 
-      <div className="door-stage">
-        <button className={`unlock-btn phase-${phase}`} disabled={!online || busy || isOpen} onClick={() => void doUnlock()}
-          aria-label={`Abrir ${device.name}`} aria-busy={busy}
-          title={isOpen ? 'La puerta ya está abierta' : undefined}>
-          <span className="ring ring-a" /><span className="ring ring-b" />
-          <span className="unlock-core">
-            {busy ? <Spinner />
-              : isOpen ? <LockOpen size={44} aria-hidden />
-              : phase === 'error' ? <X size={44} aria-hidden />
-              : <Lock size={44} aria-hidden />}
-          </span>
-        </button>
-        <p className={`unlock-label ${phase === 'error' && !pending ? 'err' : ''}`} aria-live="polite">{label}</p>
+      <div className={`rail ${device.lockdown ? 'is-lockdown' : ''}`} aria-hidden>
+        <div className={`rail-step s-locked ${stage === 'locked' ? 'on' : ''}`}><i /><span>Bloqueado</span></div>
+        <div className={`rail-step s-verifying ${stage === 'verifying' ? 'on' : ''}`}><i /><span>Verificando</span></div>
+        <div className={`rail-step s-unlocked ${stage === 'unlocked' ? 'on' : ''}`}>
+          <i>{stage === 'unlocked' && (phase === 'open' && openedAt
+            ? <b key={openedAt} style={{ animationDuration: `${device.unlock_ms}ms` }} />
+            : <b className="static" />)}</i>
+          <span className="rail-t">Desbloqueado{countdownMs > 0 && <em>{(countdownMs / 1000).toFixed(1)} s</em>}</span>
+        </div>
       </div>
+
+      <SlideToUnlock state={slideState} label={label} lockdown={device.lockdown}
+        disabled={!online || busy || isOpen} onComplete={() => void doUnlock()} />
 
       <div className="door-actions">
         <button className={`btn ${device.lockdown ? 'btn-primary' : 'btn-danger-ghost'}`} disabled={busy}
@@ -145,10 +153,10 @@ export function DoorCard({ device, onChanged }: { device: DeviceView; onChanged:
 
       <dl className="telemetry">
         <div><dt>Cerradura</dt><dd>{s.lock_state === 'locked' ? 'Cerrada' : s.lock_state === 'unlocked' ? 'Abierta' : '—'}</dd></div>
-        <div><dt>Señal</dt><dd><SignalBars bars={bars} /> {online && s.rssi != null ? `${s.rssi} dBm` : '—'}</dd></div>
         <div><dt>Último latido</dt><dd>{timeAgo(s.last_seen_at, now)}</dd></div>
-        <div><dt>IP · FW</dt><dd className="mono">{s.ip_address ?? '—'} · {s.firmware_version ?? '—'}</dd></div>
-        <div>
+        <div><dt>Firmware</dt><dd>{s.firmware_version ?? '—'}</dd></div>
+        <div><dt>IP</dt><dd>{s.ip_address ?? '—'}</dd></div>
+        <div className="wide">
           <dt>Encendida</dt>
           <dd>
             {bootedAt ? timeAgo(bootedAt, now) : '—'}

@@ -5,7 +5,7 @@ import {
   RefreshCw, ShieldAlert, TimerOff, WifiOff,
 } from 'lucide-react';
 import { previewPass, redeemPass, type PassPreview } from '../lib/guestApi';
-import { daysText, usesText } from '../lib/share';
+import { daysText } from '../lib/share';
 import { fmtDateTime } from '../lib/format';
 import { Spinner } from '../components/ui';
 
@@ -96,6 +96,7 @@ export function GuestKey() {
     try {
       const r = await redeemPass(token, value, door);
       if (r.granted) {
+        setPreview((cur) => (cur && r.uses_left !== null ? { ...cur, uses_left: r.uses_left } : cur));
         setView({ k: 'open', usesLeft: r.uses_left, unlockMs: r.unlock_ms });
         setPin('');
       } else if (r.reason === 'pin_invalid' && r.attempts_left === 0) {
@@ -144,12 +145,18 @@ export function GuestKey() {
 
   return (
     <div className="guest">
-      <div className="guest-glow" aria-hidden />
       <main className="guest-card" aria-live="polite">
-        <header className="guest-head">
-          <span className="guest-badge"><KeyRound size={14} aria-hidden /> Llave digital</span>
-          {preview?.guest && view.k !== 'loading' && view.k !== 'network' && <h1>Hola, {preview.guest}</h1>}
+        <header className="gp-head">
+          <div className="gp-brand"><KeyRound size={15} aria-hidden /><span>Llave digital</span></div>
+          {preview && view.k !== 'loading' && view.k !== 'network' && (
+            <span className={`gp-state ${view.k === 'blocked' || view.k === 'denied' ? 'off' : ''}`}>
+              <i aria-hidden />{view.k === 'blocked' || view.k === 'denied' ? 'No válida' : 'Activa'}
+            </span>
+          )}
         </header>
+        {preview?.guest && view.k !== 'loading' && view.k !== 'network' && (
+          <div className="gp-who"><span className="gp-cap">Invitado</span><h1>{preview.guest}</h1></div>
+        )}
 
         {view.k === 'loading' && <div className="guest-center"><Spinner /><p className="muted">Verificando tu acceso…</p></div>}
 
@@ -165,7 +172,7 @@ export function GuestKey() {
         {blockedInfo && (
           <div className="guest-center">
             <div className="guest-icon bad"><blockedInfo.Icon size={36} aria-hidden /></div>
-            <p className="guest-denied-tag">ACCESO DENEGADO</p>
+            <p className="guest-denied-tag">Acceso denegado</p>
             <h2>{blockedInfo.title}</h2>
             <p className="muted">{blockedInfo.text}</p>
             {view.k === 'blocked' && view.reason === 'outside_schedule' && <button className="btn" onClick={() => void load()}><RefreshCw size={16} aria-hidden />Comprobar de nuevo</button>}
@@ -176,7 +183,7 @@ export function GuestKey() {
         {deniedInfo && (
           <div className="guest-center">
             <div className="guest-icon bad"><deniedInfo.Icon size={36} aria-hidden /></div>
-            <p className="guest-denied-tag">ACCESO DENEGADO</p>
+            <p className="guest-denied-tag">Acceso denegado</p>
             <h2>{deniedInfo.title}</h2>
             <p className="muted">{deniedInfo.text}</p>
             {view.k === 'denied' && RETRYABLE.has(view.reason) && <button className="btn btn-primary" onClick={() => { setView({ k: 'ready' }); }}><RefreshCw size={16} aria-hidden />Intentar de nuevo</button>}
@@ -186,10 +193,25 @@ export function GuestKey() {
 
         {(view.k === 'ready' || view.k === 'sending') && (
           <>
-            <div className="guest-meta">
-              {doorName && <div className="guest-door"><DoorClosed size={16} aria-hidden /> {doorName}</div>}
-              {preview?.valid_until && <div className="muted small">Válido hasta {fmtDateTime(preview.valid_until)}{preview.max_uses != null ? ` · ${usesText(preview.max_uses)}` : ''}</div>}
-            </div>
+            <dl className="gp-fields">
+              {doorName && <div><dt>Puerta</dt><dd><DoorClosed size={14} aria-hidden /> {doorName}</dd></div>}
+              {preview?.valid_until && <div><dt>Válido hasta</dt><dd className="mono">{fmtDateTime(preview.valid_until)}</dd></div>}
+              {preview?.max_uses != null && (
+                <div className="gp-uses">
+                  <dt>Usos restantes</dt>
+                  <dd>
+                    <span className="mono">{preview.uses_left ?? preview.max_uses} / {preview.max_uses}</span>
+                    {preview.max_uses <= 12 && (
+                      <span className="pips" aria-hidden>
+                        {Array.from({ length: preview.max_uses }, (_, i) => <i key={i} className={i < (preview.uses_left ?? preview.max_uses!) ? 'on' : ''} />)}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              )}
+              {preview?.max_uses == null && <div className="gp-uses"><dt>Usos</dt><dd>Ilimitados en la vigencia</dd></div>}
+            </dl>
+            <div className="gp-perf" aria-hidden />
 
             {!door && preview?.devices && preview.devices.length > 1 && (
               <div className="guest-doors">
@@ -206,7 +228,7 @@ export function GuestKey() {
                   {Array.from({ length: pinLen }, (_, i) => <i key={i} className={i < pin.length ? 'on' : ''} />)}
                 </div>
                 <p className={`pin-hint ${pinError ? 'err' : ''}`} role={pinError ? 'alert' : undefined}>
-                  {view.k === 'sending' ? <><Spinner /> Verificando y abriendo…</> : pinError ?? 'Escribe tu PIN para abrir'}
+                  {view.k === 'sending' ? <><Spinner /> Verificando y abriendo…</> : pinError ?? 'Escribe tu PIN'}
                 </p>
 
                 <div className="keypad" aria-label="Teclado numérico">

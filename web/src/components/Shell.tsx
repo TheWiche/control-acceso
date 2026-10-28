@@ -16,7 +16,7 @@ export function Shell() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="brand"><ShieldCheck size={22} aria-hidden /><span>Control de Acceso</span></div>
+        <div className="brand"><span className="brand-mark"><ShieldCheck size={17} aria-hidden /></span><span>Control de Acceso</span></div>
         <nav aria-label="Principal">
           {nav.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
@@ -35,9 +35,9 @@ export function Shell() {
       </aside>
 
       <div className="main">
-        {DEMO && <div className="demo-banner">MODO DEMO · datos simulados, sin conexión a Supabase</div>}
+        {DEMO && <div className="demo-banner">MODO DEMO · datos simulados</div>}
         <header className="topbar-mobile">
-          <div className="brand"><ShieldCheck size={20} aria-hidden /><span>Control de Acceso</span></div>
+          <div className="brand"><span className="brand-mark"><ShieldCheck size={17} aria-hidden /></span><span>Control de Acceso</span></div>
           <button className="icon-btn" aria-label="Cerrar sesión" onClick={() => void signOut()}><LogOut size={20} /></button>
         </header>
         <main><Outlet /></main>

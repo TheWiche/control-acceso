@@ -4,9 +4,9 @@ import type { ActivityPoint, Metrics as M } from '../lib/types';
 
 const tiles = [
   { key: 'grantedToday', label: 'Accesos hoy', icon: CheckCircle2, tone: 'ok' },
-  { key: 'deniedToday', label: 'Denegados hoy', icon: ShieldAlert, tone: 'bad' },
-  { key: 'activePeople', label: 'Personas activas', icon: Users, tone: 'info' },
-  { key: 'activePasses', label: 'Pases vigentes', icon: Link2, tone: 'info' },
+  { key: 'deniedToday', label: 'Denegados', icon: ShieldAlert, tone: 'bad' },
+  { key: 'activePeople', label: 'Personas', icon: Users, tone: 'info' },
+  { key: 'activePasses', label: 'Pases activos', icon: Link2, tone: 'info' },
 ] as const;
 
 export function MetricsRow({ metrics }: { metrics: M | null }) {
@@ -14,11 +14,8 @@ export function MetricsRow({ metrics }: { metrics: M | null }) {
     <div className="metrics">
       {tiles.map(({ key, label, icon: Icon, tone }) => (
         <div key={key} className={`card metric tone-${tone}`}>
-          <span className="metric-icon" aria-hidden><Icon size={20} /></span>
-          <div>
-            <div className="metric-value">{metrics ? metrics[key] : <span className="skeleton" />}</div>
-            <div className="muted small">{label}</div>
-          </div>
+          <div className="metric-label"><Icon size={14} aria-hidden />{label}</div>
+          <div className="metric-value">{metrics ? metrics[key] : <span className="skeleton" />}</div>
         </div>
       ))}
     </div>

@@ -139,7 +139,7 @@ export function EnrollModal({ devices, people, onClose, onSaved }: {
 
       {(step === 'starting' || step === 'listening') && (
         <div className="listen">
-          <div className="radar" aria-hidden><span /><span /><span /><Nfc size={42} /></div>
+          <div className="radar" aria-hidden><div className="radar-sweep" /><i /><i /><i /><div className="radar-core"><Nfc size={34} /></div></div>
           <h3>{step === 'starting' ? 'Activando lector…' : 'Acerca el llavero o la tarjeta al lector'}</h3>
           <p className="muted">Apóyalo sobre el PN532 de <strong>{device?.name}</strong>. Aparecerá aquí automáticamente.</p>
           {step === 'listening' && <div className="countdown mono" aria-live="off">{mmss(Math.max(0, msLeft))}</div>}
@@ -148,8 +148,9 @@ export function EnrollModal({ devices, people, onClose, onSaved }: {
 
       {step === 'captured' && (
         <div className="stack">
+          <div className="hit" aria-hidden><span><CheckCircle2 size={30} /></span></div>
           <div className="captured">
-            <CheckCircle2 size={22} aria-hidden />
+            <Nfc size={20} aria-hidden />
             <div><span className="muted small">Tarjeta detectada</span><div className="uid mono">{uid ? fmtUid(uid) : '—'}</div></div>
           </div>
 

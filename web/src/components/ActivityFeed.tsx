@@ -4,6 +4,11 @@ import type { AccessLog } from '../lib/types';
 import { DENY_REASONS, METHOD_LABELS, fmtDuration, fmtTime, fmtUid, isUnknownCard, timeAgo } from '../lib/format';
 import { Empty, Segmented, useNow } from './ui';
 
+const VIA: Record<string, [string, string]> = {
+  credential: ['Llavero', 'via-fob'], guest_pass: ['PIN', 'via-pin'], remote_app: ['App', 'via-app'],
+  door_tag: ['App', 'via-app'], exit_button: ['Salida', ''], system: ['Sistema', ''],
+};
+
 const methodIcon = (m: AccessLog['method']) =>
   m === 'guest_pass' ? Link2 : m === 'remote_app' || m === 'door_tag' ? Smartphone : KeyRound;
 
@@ -37,6 +42,7 @@ export function ActivityFeed({ logs, fresh }: { logs: AccessLog[]; fresh: Set<nu
                       : (l.actor_name ?? 'Acceso concedido')}
                   </strong>
                   <span className="muted small">
+                    <span className={`via ${VIA[l.method]?.[1] ?? ''}`}>{VIA[l.method]?.[0] ?? l.method}</span>
                     {unknown && l.credential_uid ? <><span className="mono">{fmtUid(l.credential_uid)}</span> · </> : null}
                     {denied && !unknown && l.actor_name ? `${l.actor_name} · ` : null}
                     {l.meta?.action === 'hold_open'
@@ -46,7 +52,7 @@ export function ActivityFeed({ logs, fresh }: { logs: AccessLog[]; fresh: Set<nu
                   </span>
                 </div>
                 <time className="feed-time" dateTime={l.occurred_at} title={fmtTime(l.occurred_at)}>
-                  <span>{fmtTime(l.occurred_at).slice(0, 5)}</span>
+                  <span>{fmtTime(l.occurred_at)}</span>
                   <span className="muted small">{timeAgo(l.occurred_at, now)}</span>
                 </time>
               </li>

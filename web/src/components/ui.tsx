@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronsRight, Info, LockOpen, X, XCircle } from 'lucide-react';
 
 /** Reloj reactivo para contadores ("hace 12 s", cuenta regresiva). */
 export function useNow(ms = 1000) {
@@ -73,10 +73,33 @@ export function Modal({ title, onClose, children, footer, wide = false, dismissa
       prev?.focus?.();
     };
   }, []);
+  // Móvil: la hoja se arrastra hacia abajo desde el asa o el encabezado y se cierra al soltar pasado el umbral.
+  const [dragY, setDragY] = useState<number | null>(null);
+  const drag = useRef<{ y0: number } | null>(null);
+  const onDragStart = (e: React.PointerEvent) => {
+    if (!dismissable || !window.matchMedia('(max-width: 640px)').matches) return;
+    if ((e.target as HTMLElement).closest('button')) return;
+    drag.current = { y0: e.clientY };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDragY(0);
+  };
+  const onDragMove = (e: React.PointerEvent) => {
+    if (drag.current) setDragY(Math.max(0, e.clientY - drag.current.y0));
+  };
+  const onDragEnd = () => {
+    if (!drag.current) return;
+    const far = (dragY ?? 0) > 90;
+    drag.current = null;
+    if (far) closeRef.current(); else setDragY(null);
+  };
+  const dragProps = { onPointerDown: onDragStart, onPointerMove: onDragMove, onPointerUp: onDragEnd, onPointerCancel: onDragEnd };
+
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && dismissable) onClose(); }}>
-      <div className={`sheet ${wide ? 'sheet-wide' : ''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>
-        <header className="sheet-head">
+      <div className={`sheet ${wide ? 'sheet-wide' : ''} ${drag.current ? 'dragging' : ''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}
+        style={dragY ? { transform: `translateY(${dragY}px)` } : undefined}>
+        {dismissable && <div className="sheet-grab" aria-hidden {...dragProps}><i /></div>}
+        <header className="sheet-head" {...dragProps}>
           <h2>{title}</h2>
           {dismissable && <button className="icon-btn" aria-label="Cerrar" onClick={onClose}><X size={20} /></button>}
         </header>
@@ -146,5 +169,53 @@ export function SignalBars({ bars }: { bars: number }) {
     <span className="signal" aria-label={`Señal ${bars} de 4`}>
       {[1, 2, 3, 4].map((i) => <i key={i} className={i <= bars ? 'on' : ''} style={{ height: 4 + i * 3 }} />)}
     </span>
+  );
+}
+
+/* ---------------- Deslizador de apertura ---------------- */
+export type SlideState = 'idle' | 'verifying' | 'unlocked' | 'error';
+
+/**
+ * "Desliza para abrir". Un toque suelto no hace nada (evita aperturas por error); hay que arrastrar el tirador
+ * más del 88 % del recorrido. Con teclado, Enter/Espacio sobre el tirador equivale a completar el gesto.
+ */
+export function SlideToUnlock({ state, label, disabled, lockdown, onComplete }: {
+  state: SlideState; label: string; disabled?: boolean; lockdown?: boolean; onComplete: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const start = useRef<{ x: number; w: number } | null>(null);
+  const [p, setP] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const locked = disabled || state !== 'idle';
+  const shown = state === 'verifying' || state === 'unlocked' ? 1 : dragging ? p : 0;
+
+  const down = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (locked || !ref.current) return;
+    start.current = { x: e.clientX, w: ref.current.clientWidth - 62 };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDragging(true); setP(0);
+  };
+  const move = (e: React.PointerEvent) => {
+    if (!start.current) return;
+    setP(Math.min(1, Math.max(0, (e.clientX - start.current.x) / start.current.w)));
+  };
+  const up = () => {
+    if (!start.current) return;
+    const done = p >= 0.88;
+    start.current = null; setDragging(false); setP(0);
+    if (done) { navigator.vibrate?.(14); onComplete(); }
+  };
+
+  return (
+    <div ref={ref} className={`slide ${state}${dragging ? ' dragging' : ''}${locked ? ' disabled' : ''}${lockdown ? ' lockdown' : ''}`}
+      style={{ '--p': shown } as React.CSSProperties}>
+      <div className="slide-fill" />
+      <span className="slide-label" aria-live="polite">{label}</span>
+      <button type="button" className="slide-handle" disabled={locked} aria-label={label}
+        onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+        onClick={(e) => { if (e.detail === 0 && !locked) onComplete(); }}>
+        {state === 'verifying' ? <Spinner /> : state === 'unlocked' ? <LockOpen size={22} aria-hidden /> : state === 'error' ? <X size={22} aria-hidden /> : <ChevronsRight size={24} aria-hidden />}
+      </button>
+    </div>
   );
 }
