@@ -16,8 +16,7 @@ Compila con 0 errores (RAM 14,7 %, flash 55,9 %). **Aún no se ha probado con el
 | 3b | Transistor relé | 2N2222A / PN2222A (o BC337) | uno más aparte del del zumbador |
 | 4 | Cerradura | Solenoide 12 V DC, *fail-secure* (bloquea sin corriente) | anota su corriente (típico 0,5–1 A) |
 | 5 | Diodos | 2×: **1N4007** en el solenoide (**1N5408** si pasa de 1 A) + **1N4007 o 1N4148** en la bobina del relé | protección *flyback*, ambos obligatorios |
-| 6 | Fuente | 12 V DC ≥ 2 A | una sola fuente para todo |
-| 7 | Reductor | LM2596 o MP1584, 12 V → **5,0 V** | **ajustar a 5,0 V antes de conectar el ESP32** |
+| 6 | Módulo de pared multivoltaje | salidas simultáneas **3,3 V, 5 V y 12 V** con GND común | comprueba con el multímetro cada salida antes de conectar nada; las corrientes máximas de cada riel están en su etiqueta |
 | 8 | Condensadores | 1× 470–1000 µF/25 V, 1× 10 µF, 1× 100 nF | estabilidad ante picos del solenoide |
 | 9 | Resistencias | 1× 10 kΩ, 2× 330 Ω, 2× 1 kΩ | pull-down del relé, LEDs, bases de los dos transistores |
 | 10 | Interfaz | pulsador NA (salida), LED verde y rojo, zumbador activo 5 V + 2N2222, reed switch (opcional) | |
@@ -89,11 +88,11 @@ Las marcas varían: **PN2222A** (cara plana hacia ti, patas abajo) = **E-B-C**; 
 | **Base** del NPN | resistencia **10 kΩ** → **GND** | **pull-down**: mantiene el transistor cortado (relé en reposo, puerta bloqueada) mientras el ESP32 arranca, se reinicia o se programa y el GPIO queda flotando |
 | **Emisor** del NPN | **GND** (punto único de masa, §5) | |
 | **Colector** del NPN | **pata 2 de la bobina** | |
-| **Pata 1 de la bobina** | **+5 V del reductor** | **no** desde el 3V3 del ESP32 ni desde su pin 5V si está alimentado por USB |
+| **Pata 1 de la bobina** | **+5 V del módulo de pared** | **no** desde el 3V3 del ESP32 ni desde su pin 5V si está alimentado por USB |
 | Diodo **1N4007 / 1N4148** de bobina | **en paralelo con la bobina**: **franja (cátodo) → pata 1 (+5 V)**, ánodo → pata 2 (colector) | sin él, el pico de la bobina al apagar (>50 V) **destruye el transistor** en pocos ciclos |
 
 ```
-            +5 V (reductor)
+            +5 V (módulo de pared)
                │
                ├──────────┐
                │        ──┴──  1N4007/1N4148
@@ -116,13 +115,13 @@ Las marcas varían: **PN2222A** (cara plana hacia ti, patas abajo) = **E-B-C**; 
 
 ---
 
-## 4. Etapa de potencia: relé ↔ solenoide ↔ fuente 12 V
+## 4. Etapa de potencia: relé ↔ solenoide ↔ riel de 12 V
 
 | Desde | Hasta | Calibre |
 |---|---|---|
-| Fuente **+12 V** | Relé **COM** | AWG 20–22 |
+| Módulo, salida **+12 V** | Relé **COM** | AWG 20–22 |
 | Relé **NO** (normalmente abierto) | Solenoide **+** (cable rojo) | AWG 20–22 |
-| Solenoide **−** (cable negro) | Fuente **−12 V (GND)** | AWG 20–22 |
+| Solenoide **−** (cable negro) | Módulo, **GND** | AWG 20–22 |
 | Relé **NC** | **sin conectar** | con un solenoide *fail-secure* |
 
 ### Diodo 1N4007 (dónde va exactamente)
@@ -140,31 +139,32 @@ Añade además un **condensador de 470–1000 µF/25 V** entre +12 V y −12 V, 
 
 ## 5. Alimentación y tierra común
 
+Un único **módulo de pared multivoltaje** entrega a la vez **3,3 V, 5 V y 12 V** con una **GND común**. No hay reductor que ajustar.
+
 ```
-                     ┌─────────── FUENTE 12 V (≥2 A) ───────────┐
-                     │ +12V                                −12V │
-                     └───┬───────────────────────────────────┬──┘
-                         │                                   │
-          ┌──────────────┼──────────────┐                    │
-          │              │              │                    │
-          │         ┌────┴─────┐   Relé COM                  │
-          │         │ REDUCTOR │   Relé NO ──┬── Solenoide + │
-          │         │ 12V→5,0V │             │  [1N4007: franja aquí]
-          │         └─┬──────┬─┘             └── Solenoide − ┤   ← retorno directo a la fuente
-          │        5V │      │ GND                           │
-          │           │      ●───────── PUNTO ÚNICO DE MASA ──┘   (−12V y GND 5V unidos aquí)
-          │           │      │
-          │   ESP32 VIN     ESP32 GND ── PN532 GND ── emisor NPN relé ── 10 kΩ pull-down ── LEDs/botón GND
-          │   bobina relé (pata 1)
-          │
-     [470–1000 µF entre +12V y −12V junto al relé]
+   ┌──────────────── MÓDULO DE PARED ────────────────┐
+   │   +12V          +5V          +3,3V         GND   │
+   └────┬─────────────┬─────────────┬────────────┬────┘
+        │             │             │            │
+     Relé COM     ESP32 VIN     PN532 VCC        │
+     Relé NO ──┬─ Solenoide +  (el 3V3 del       │
+               │  [1N4007: franja aquí]  ESP32   │
+               └─ Solenoide − ─── no se usa) ────┤  retorno directo del solenoide
+                                                 │
+     bobina del relé (pata 1) ← +5 V             │
+                                                 │
+   ESP32 GND ─ PN532 GND ─ emisor NPN ─ 10 kΩ pull-down ─ LEDs/botón ─┘  (un solo punto de masa)
+
+   [470–1000 µF entre +12V y GND, junto al relé]
 ```
 
-- **Tierra común:** los reductores LM2596/MP1584 **no son aislados**: su `IN−` y `OUT−` son el mismo conductor. Así, el −12 V de la fuente y el GND del ESP32 ya quedan unidos. Únelos en **un solo punto** (el borne `OUT−` del reductor o el −12 V de la fuente), en estrella.
-- **La corriente del solenoide vuelve por su propio cable** directamente al −12 V. No la hagas pasar por los cables de GND del ESP32 ni del PN532: así el pico no "levanta" la tierra de la lógica.
-- **Si usas dos fuentes** (por ejemplo, cargador USB para el ESP32 y fuente de 12 V para el solenoide): con el transistor NPN **es obligatorio unir sus GND** en un solo punto. Sin masa común, el HIGH del GPIO no tiene referencia y el relé no se activa (o lo hace de forma errática).
-- **Ajusta el reductor a 5,0 V con el multímetro ANTES de conectar el ESP32.** Los LM2596 vienen de fábrica con cualquier tensión (a veces 12 V): quemarían la placa.
-- **No alimentes el ESP32 por USB y por VIN a la vez** en la instalación final. Para programar, desconecta VIN o usa solo el USB.
+- **PN532 a 3,3 V:** usa **un solo** riel de 3,3 V (el del módulo). El regulador del ESP32 es de poca corriente y el PN532 llega a ~150 mA al leer.
+- **Tierra común:** ya la une el módulo. Haz la unión en **un solo punto** (el borne GND del módulo) y llega a él con un cable por cada bloque: ESP32/PN532/transistor por un lado y el retorno del solenoide por otro.
+- **La corriente del solenoide vuelve por su propio cable** directamente al GND del módulo. No la hagas pasar por los cables de GND del ESP32 ni del PN532: así el pico no "levanta" la tierra de la lógica.
+- **Corrientes:** suma lo que pides al riel de 5 V (ESP32 ≈ 250 mA, con picos de ~500 mA al usar WiFi, + bobina del relé ≈ 70–90 mA + zumbador). Si la etiqueta del módulo da menos en 5 V, el ESP32 se reiniciará al activar el relé.
+- **Solenoide: ciclo de trabajo.** La mayoría de solenoides de 12 V no están hechos para estar energizados de forma continua y se calientan. Los pulsos de 3 s están bien; **evita «Mantener puerta abierta» durante muchos minutos** salvo que su ficha indique servicio continuo.
+- **Antes de conectar el ESP32, mide** con el multímetro la salida de 5 V (debe dar 4,8–5,2 V) y la de 3,3 V.
+- **No alimentes el ESP32 por USB y por VIN a la vez** en la instalación final. Para programar, usa solo el USB o desconecta VIN.
 
 ---
 
@@ -187,8 +187,8 @@ Pines evitados a propósito: 0, 2, 5, 12, 15 (arranque) y 6–11 (flash interna)
 | 22 | PN532 SCL | | 27 | Pulsador de salida |
 | 4 | PN532 IRQ | | 25 | Reed switch |
 | 33 | PN532 RSTPDN (opcional) | | 18 / 19 | LED verde / rojo |
-| 3V3 | PN532 VCC | | 23 | Zumbador (vía transistor) |
-| VIN | 5 V del reductor (el mismo que la bobina del relé) | | GND | punto único de masa |
+| — | PN532 VCC ← 3,3 V del módulo | | 23 | Zumbador (vía transistor) |
+| VIN | 5 V del módulo de pared (el mismo que la bobina del relé) | | GND | punto único de masa |
 
 ---
 

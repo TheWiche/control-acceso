@@ -29,7 +29,7 @@ flowchart LR
     EF["Edge Functions (Deno)"]
     CRON[pg_cron]
   end
-  BRK["Broker MQTT en la nube<br/>(HiveMQ Cloud / EMQX Serverless)"]
+  BRK["Broker MQTT en la nube<br/>(EMQX Cloud Serverless)"]
   ESP["ESP32 + PN532 + solenoide"]
 
   PH -- "abre URL" --> PWA
@@ -38,7 +38,7 @@ flowchart LR
   RT --- DB
   PWA -- "unlock / pass-redeem / enroll-start" --> EF
   EF -- "service_role: SQL atómico" --> DB
-  EF -- "MQTT sobre WSS 8884 (publica comando firmado)" --> BRK
+  EF -- "MQTT sobre WSS 8084 (publica comando firmado)" --> BRK
   BRK -- "MQTT TLS 8883 (suscrito)" --> ESP
   ESP -- "HTTPS: latido, tap, enroll_read, ACK" --> EF
   CRON --> DB
@@ -150,7 +150,7 @@ Las funciones con "no" en JWT se despliegan con `--no-verify-jwt` y hacen su pro
 
 ## 5. MQTT
 
-- **Broker:** HiveMQ Cloud Serverless (plan gratuito) o EMQX Cloud Serverless. Ambos dan TLS 8883 (dispositivo) y WebSocket seguro (Edge Functions). *Verifica los límites vigentes del plan gratuito al crearlo; el diseño solo necesita 1 publisher + N dispositivos y tráfico mínimo.*
+- **Broker:** EMQX Cloud Serverless (plan gratuito; HiveMQ Cloud también sirve). Dan TLS 8883 (dispositivo) y WebSocket seguro (Edge Functions). *Verifica los límites vigentes del plan gratuito al crearlo; el diseño solo necesita 1 publisher + N dispositivos y tráfico mínimo.*
 - **Tópicos** (`v1` permite migrar el protocolo):
   - `acc/v1/<device_code>/cmd` — servidor → ESP32, QoS 1, **sin retain**.
   - `acc/v1/<device_code>/status` — LWT/estado del ESP32 (retenido). Reservado para un futuro puente; hoy la presencia sale del latido HTTPS.

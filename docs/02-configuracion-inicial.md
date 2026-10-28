@@ -72,7 +72,7 @@ select * from public.access_logs order by id desc limit 1;
 
 ## 5. Broker MQTT
 
-1. Crea un clúster gratuito en **HiveMQ Cloud** (Serverless) o **EMQX Cloud Serverless**.
+1. Crea un clúster gratuito en **EMQX Cloud Serverless** (HiveMQ Cloud también sirve).
 2. Crea dos tipos de credencial:
    - `acc-publisher` (publicar en `acc/v1/#`) → solo para las Edge Functions.
    - Una por dispositivo, p. ej. `dev-puerta01x` (suscribir `acc/v1/puerta01x/cmd`). Si el plan gratuito no permite restringir por tópico, **no pasa nada grave**: los comandos van firmados (ver arquitectura §5), pero igual usa una credencial distinta por dispositivo para poder revocarla.

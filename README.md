@@ -13,7 +13,7 @@ scripts/     supabase-setup.sh (backend en 1 comando) · new-device.sql (admin, 
 ```
 
 ## Empezar
-**Sigue [docs/06-guia-manual.md](docs/06-guia-manual.md)**: Supabase → HiveMQ → backend → GitHub Pages → firmware → prueba con el llavero.
+**Sigue [docs/06-guia-manual.md](docs/06-guia-manual.md)**: Supabase → EMQX → backend → GitHub Pages → firmware → prueba con el llavero.
 Montaje eléctrico pin a pin: [docs/05-firmware.md](docs/05-firmware.md).
 
 Ver la web sin backend: `cd web && npm install && npm run demo`.
@@ -33,6 +33,6 @@ Todo esto corre en GitHub Actions en cada push (`ci.yml`, `firmware-ci.yml`).
 |---|---|---|
 | SQL (6 migraciones) | 84 pruebas en Postgres (PGlite): reglas, RLS, permisos, caché, pases | aplicar en tu proyecto real |
 | Integración entre capas | 353 comprobaciones automáticas (tablas, columnas, embeds, RPC, MQTT, comandos, env) | — |
-| Edge Functions | `deno check` de las 7; MQTT por WSS desde Deno probado contra un broker HiveMQ real; firma verificada | ejecución contra tu Supabase |
+| Edge Functions | `deno check` de las 7; MQTT por WSS probado contra tu broker EMQX real (WSS 8084 → TLS 8883); firma verificada | ejecución contra tu Supabase |
 | Web | typecheck + build de producción con base `/<repo>/`; todos los flujos en navegador (demo) | contra tu Supabase |
 | Firmware | compila 0 errores con versiones fijadas; ESP32-D0WD-V3 4 MB detectado en COM3 | cargar con tus credenciales y probar con el hardware |

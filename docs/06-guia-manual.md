@@ -36,19 +36,20 @@ Lleva una nota segura (gestor de contraseñas) donde irás pegando estos 10 valo
    - **Allow new users to sign up: DESACTIVADO** (solo entrarás tú y quien invites) → **Save**.
 5. **Token para la CLI**: <https://supabase.com/dashboard/account/tokens> → **Generate new token** → nombre `control-acceso` (si ofrece permisos, limítalo a este proyecto) → copia el `sbp_…` → `SUPABASE_ACCESS_TOKEN`. Solo se muestra una vez.
 
-## B. Broker MQTT (HiveMQ Cloud, gratis, con WSS)
+## B. Broker MQTT (EMQX Cloud Serverless, gratis, con WSS)
 
-1. <https://console.hivemq.cloud> → **Sign up** → **Create cluster** → **Serverless (Free)** → elige nube y región → **Create**.
-2. Abre el clúster → pestaña **Overview** y anota:
-   - **Host**: `xxxxxxxx.s1.eu.hivemq.cloud` → `MQTT_HOST`
-   - **Port (TLS MQTT)**: `8883` — lo usa el ESP32
-   - **Port (TLS WebSocket)**: `8884`, ruta `/mqtt` — lo usan las Edge Functions
-3. Pestaña **Access Management** → **Credentials** → **Add credentials**, dos veces:
-   - Usuario `acc-publisher` + contraseña larga, permiso **Publish and Subscribe** → `MQTT_PASSWORD`.
-   - Usuario `dev-puerta01x` (usa tu device_code) + otra contraseña, permiso **Publish and Subscribe** → `MQTT_DEVICE_PASSWORD`.
-   - Si el plan permite restringir tópicos: `acc-publisher` publica en `acc/v1/#`; el dispositivo se suscribe a `acc/v1/puerta01x/cmd` y publica en `acc/v1/puerta01x/status`. Si no lo permite, no es grave: los comandos van firmados.
+1. <https://cloud-intl.emqx.com> → **Sign up** → **New Deployment** → **Serverless** (plan gratuito) → elige región → **Deploy**.
+2. Abre el despliegue → **Overview** → *MQTT Connection Information* y anota:
+   - **Address**: `xxxxxxxx.ala.us-east-1.emqxsl.com` → `MQTT_HOST`
+   - **MQTT over TLS/SSL Port**: `8883` — lo usa el ESP32
+   - **WebSocket over TLS/SSL Port**: `8084`, ruta `/mqtt` — lo usan las Edge Functions
+   - El certificado CA que ofrece descargar es DigiCert Global Root CA, que el ESP32 ya trae en su bundle: **no hace falta cargarlo**.
+3. **Authentication** (menú del despliegue) → **Add** → usuario y contraseña, dos veces:
+   - Usuario `acc-publisher` + contraseña larga → `MQTT_PASSWORD`.
+   - Usuario `dev-puerta01x` (usa tu device_code) + otra contraseña distinta → `MQTT_DEVICE_PASSWORD`.
+   - Si el plan permite restringir tópicos (**Authorization** → ACL): `acc-publisher` publica en `acc/v1/#`; el dispositivo se suscribe a `acc/v1/puerta01x/cmd` y publica en `acc/v1/puerta01x/status`. Si no, no es grave: los comandos van firmados.
 4. Los valores finales quedan así:
-   - Edge Functions: `MQTT_URL=wss://<MQTT_HOST>:8884/mqtt`
+   - Edge Functions: `MQTT_URL=wss://<MQTT_HOST>:8084/mqtt`
    - Firmware: `MQTT_URI "mqtts://<MQTT_HOST>:8883"`
 
 ## C. Desplegar el backend (desde tu PC, Git Bash)
@@ -109,7 +110,7 @@ Lleva una nota segura (gestor de contraseñas) donde irás pegando estos 10 valo
    - `INGEST_URL` = `https://<ref>.supabase.co/functions/v1/device-ingest`
    - `SUPABASE_KEY` = la publishable.
    - `MQTT_URI` = `mqtts://<MQTT_HOST>:8883`, `MQTT_USER` = `dev-puerta01x`, `MQTT_PASS` = `MQTT_DEVICE_PASSWORD`.
-3. Monta el circuito siguiendo [docs/05](05-firmware.md) §2–§6 **sin conectar todavía la fuente de 12 V**. Ajusta antes el reductor a **5,0 V**.
+3. Monta el circuito siguiendo [docs/05](05-firmware.md) §2–§6 **sin conectar todavía el solenoide**. Con el módulo de pared, mide primero con el multímetro que cada salida da lo que dice (3,3 / 5 / 12 V) antes de enchufar el ESP32.
 4. Carga el firmware (ESP32 por USB):
    ```bash
    cd firmware
@@ -127,7 +128,7 @@ Lleva una nota segura (gestor de contraseñas) donde irás pegando estos 10 valo
 5. Botón **Abrir puerta** del panel: el relé abre 3 s. Prueba **Bloqueo total**: el llavero deja de abrir (salvo que seas admin) y el botón de salida sigue abriendo. Quítalo.
 6. **Invitados → Nuevo acceso** → 1 solo uso → **Compartir por WhatsApp** a tu propio número → abre el enlace en el móvil, escribe el PIN: la puerta abre. Ábrelo otra vez: "Sin usos disponibles".
 7. **Prueba offline**: espera 1 minuto (sincroniza la caché), desenchufa el router: el llavero sigue abriendo (destello rojo cada 3 s = sin red). Reconecta: en ≤ 15 s los accesos offline aparecen en el feed.
-8. Solo ahora conecta la fuente de 12 V y el solenoide (con el diodo) y repite el paso 3 veinte veces mirando el monitor: el ESP32 no debe reiniciarse.
+8. Solo ahora conecta el solenoide a los 12 V (con su diodo) y repite el paso 3 veinte veces mirando el monitor: el ESP32 no debe reiniciarse.
 
 ## G. Si algo falla
 
