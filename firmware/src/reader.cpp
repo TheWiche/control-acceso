@@ -79,7 +79,11 @@ void i2cBusRecover() {
 }
 
 void arm() {
-  s_armed = nfc.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
+  // La librería devuelve false también cuando el PN532 aceptó la orden pero aún no hay tarjeta (tras el ACK
+  // espera la respuesta 100 ms). La detección queda en marcha igualmente: avisará por IRQ. Un lector colgado
+  // lo detecta la comprobación de salud periódica (getFirmwareVersion).
+  nfc.startPassiveTargetIDDetection(PN532_MIFARE_ISO14443A);
+  s_armed = true;
   s_armedAt = millis();
 }
 
