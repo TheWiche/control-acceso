@@ -25,6 +25,21 @@ std::atomic<bool>     g_mqttUp{false};
 std::atomic<bool>     g_disabled{false};
 std::atomic<uint32_t> g_enrollUntilMs{0};
 
+static portMUX_TYPE s_nameMux = portMUX_INITIALIZER_UNLOCKED;
+static char s_deviceName[33] = "";
+
+void setDeviceName(const char* name) {
+  portENTER_CRITICAL(&s_nameMux);
+  strlcpy(s_deviceName, name, sizeof s_deviceName);
+  portEXIT_CRITICAL(&s_nameMux);
+}
+
+void deviceName(char* out, size_t n) {
+  portENTER_CRITICAL(&s_nameMux);
+  strlcpy(out, s_deviceName, n);
+  portEXIT_CRITICAL(&s_nameMux);
+}
+
 static portMUX_TYPE s_enrollMux = portMUX_INITIALIZER_UNLOCKED;
 static char s_enrollSession[37] = {0};
 

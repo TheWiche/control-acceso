@@ -3,10 +3,11 @@
 //  Configuración de hardware y tiempos (los secretos van en secrets.h)
 // ============================================================================
 
-#define FW_VERSION "1.2.2"
+#define FW_VERSION "1.3.0"
 
 // ---------------- Pines (ESP32 DevKit / WROOM-32) ----------------
-// Evitados a propósito: 0, 2, 5, 12, 15 (strapping) y 6-11 (flash).
+// Evitados a propósito: 0, 2, 5, 12 (strapping) y 6-11 (flash). El 15 (strapping) solo como CS de la
+// pantalla: en reposo está en alto, igual que su pull-up de arranque.
 // Lector PN532. SPI es lo recomendado con el ESP32: por I2C el PN532 retiene SCL (clock stretching)
 // y el controlador del ESP32 se queda en timeout (Error 263), sobre todo con el ruido del solenoide.
 #define NFC_USE_SPI       1   // 1 = SPI (DIP: 1 OFF, 2 ON) · 0 = I2C (DIP: 1 ON, 2 OFF)
@@ -31,6 +32,17 @@
 #define PIN_LED_RED      19
 #define PIN_BUZZER       23   // zumbador ACTIVO vía transistor. -1 si no hay
 
+// ---------------- Pantalla TFT 1,8" 128x160 (ST7735), bus SPI propio (HSPI) ----------------
+#define DISPLAY_ENABLED   1   // 0 = sin pantalla
+#define PIN_TFT_SCK      14   // pin "SCL" de la pantalla (reloj SPI)
+#define PIN_TFT_MOSI     13   // pin "SDA" de la pantalla (datos SPI)
+#define PIN_TFT_CS       15
+#define PIN_TFT_DC       17
+#define PIN_TFT_RST      16
+#define TFT_TAB          INITR_BLACKTAB   // colores cambiados o bordes con basura: INITR_GREENTAB o INITR_REDTAB
+#define TFT_ROTATION      1   // 1 = horizontal (160x128) · 0 = vertical (128x160)
+#define TFT_SPI_HZ  16000000  // 16 MHz: margen para cables de protoboard
+
 // ---------------- Tiempos ----------------
 #define HEARTBEAT_MS              15000UL   // latido HTTPS (también trae la versión de la lista blanca). El servidor
                                             // marca la puerta desconectada a los 45 s sin latido
@@ -51,6 +63,7 @@
 #define ENROLL_WINDOW_MS          60000UL
 #define DEFAULT_UNLOCK_MS          3000UL
 #define EXIT_DEBOUNCE_MS             60UL
+#define UI_EVENT_MS                2500UL   // duración en pantalla de "Bienvenido", "Denegado"…
 
 // ---------------- Seguridad / límites ----------------
 #define CMD_SKEW_S                   30     // tolerancia de reloj para iat/exp de los comandos

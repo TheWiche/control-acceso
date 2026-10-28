@@ -10,6 +10,7 @@ void tick();
 
 void pulse(uint32_t ms);              // apertura temporal
 void holdOpenUntil(uint32_t epoch);   // 0 = asegurar de nuevo
+uint32_t holdUntil();                 // epoch de cierre de "mantener abierta" (0 = no hay)
 void setLockdown(bool on);            // se guarda en NVS: sobrevive a reinicios sin red
 bool lockdown();
 void setDefaultUnlockMs(uint32_t ms); // devices.unlock_ms (NVS)

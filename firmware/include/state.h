@@ -25,6 +25,7 @@ struct AccessResponse {
   bool     granted;
   uint32_t unlockMs;
   char     reason[24];
+  char     name[32];      // nombre de la persona (para la pantalla)
 };
 
 extern QueueHandle_t g_netQueue;    // lector -> red
@@ -46,6 +47,10 @@ inline uint32_t nowEpoch() { return (uint32_t)time(nullptr); }
 
 /** a - b para millis() tolerante al desbordamiento. */
 inline int32_t msDiff(uint32_t a, uint32_t b) { return (int32_t)(a - b); }
+
+/** Nombre de la puerta (devices.name, llega en el latido) para la pantalla. Seguro entre tareas. */
+void setDeviceName(const char* name);
+void deviceName(char* out, size_t n);
 
 /** Motivo del último arranque: power_on, brownout, watchdog, panic, software, external, deep_sleep, other. */
 const char* resetReasonName();

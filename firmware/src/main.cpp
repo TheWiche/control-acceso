@@ -1,7 +1,8 @@
 // ============================================================================
 //  Control de Acceso — firmware ESP32
-//    Núcleo 1: tarea de E/S (relé, botón, LEDs, cada 10 ms) y tarea del lector (PN532, decisión
-//              de acceso) — el lector nunca espera a la red más de 2,5 s y no puede frenar el relé
+//    Núcleo 1: tarea de E/S (relé, botón, LEDs, cada 10 ms), tarea del lector (PN532, decisión
+//              de acceso; nunca espera a la red más de 2,5 s y no puede frenar el relé) y tarea
+//              de la pantalla (prioridad mínima)
 //    Núcleo 0: tarea de red (WiFi, MQTT, HTTPS, caché)
 // ============================================================================
 #include <Arduino.h>
@@ -13,6 +14,7 @@
 #include "lock.h"
 #include "net.h"
 #include "state.h"
+#include "ui.h"
 
 #if __has_include("secrets.h")
 #include "secrets.h"
@@ -32,6 +34,8 @@ void setup() {
   Lock::begin();        // primero: relé en reposo (cerrado) cuanto antes
   Feedback::begin();
   Cache::begin();
+  setDeviceName(DEVICE_CODE);   // hasta que el primer latido traiga el nombre real de la puerta
+  Ui::begin();
 
   // Watchdog de tareas: si el lector o la red se cuelgan, el ESP32 se reinicia (el relé vuelve a reposo).
 #if ESP_IDF_VERSION_MAJOR >= 5
@@ -47,6 +51,9 @@ void setup() {
   xTaskCreatePinnedToCore(ioTask, "io", 4096, nullptr, 4, nullptr, 1);
   xTaskCreatePinnedToCore(readerTask, "reader", 6144, nullptr, 3, nullptr, 1);
   xTaskCreatePinnedToCore(netTask, "net", 12288, nullptr, 2, nullptr, 0);
+#if DISPLAY_ENABLED
+  xTaskCreatePinnedToCore(uiTask, "ui", 4096, nullptr, 1, nullptr, 1);   // la menor prioridad: nunca frena al relé
+#endif
 }
 
 void loop() {

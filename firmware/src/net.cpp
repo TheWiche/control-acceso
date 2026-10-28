@@ -12,6 +12,7 @@
 #include "lock.h"
 #include "secrets.h"
 #include "state.h"
+#include "ui.h"
 
 // Bundle de CAs raíz de ESP-IDF (CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL en el core Arduino).
 // Se declara a mano porque el <esp_crt_bundle.h> de la librería WiFiClientSecure de Arduino oculta el de IDF.
@@ -238,6 +239,7 @@ void handleCommand(const MqttMsg& m) {
     uint32_t ms = strtoul(arg, nullptr, 10);
     Lock::pulse(ms ? ms : Lock::defaultUnlockMs());
     Feedback::signal(Feedback::Granted);
+    Ui::event(Ui::Remote);
   } else if (cmd == "hold_open") {
     // arg = hora absoluta de cierre (epoch, s), la misma que guarda la base. Un número pequeño son
     // minutos (formato del servidor anterior). Nunca más de HOLD_MAX_S desde ahora.
@@ -255,6 +257,7 @@ void handleCommand(const MqttMsg& m) {
   } else if (cmd == "enroll_start") {
     enrollStart(arg);
     Feedback::signal(Feedback::EnrollArmed);
+    Ui::event(Ui::EnrollWait);
   } else if (cmd == "enroll_cancel") {
     enrollCancel(arg);
   } else {
@@ -284,6 +287,7 @@ void handleRequest(const NetRequest& r) {
       resp.granted = res["granted"] | false;
       resp.unlockMs = res["unlock_ms"] | Lock::defaultUnlockMs();
       strlcpy(resp.reason, res["reason"] | "", sizeof resp.reason);
+      strlcpy(resp.name, res["name"] | "", sizeof resp.name);
     }
     xQueueOverwrite(g_accessResp, &resp);
   } else if (r.type == ReqType::Fallback) {
@@ -297,6 +301,8 @@ void handleRequest(const NetRequest& r) {
     int st = apiPost(req, res);
     bool ok = st == 200 && res["ok"] == true;
     Feedback::signal(ok ? Feedback::EnrollOk : Feedback::EnrollFail);
+    if (ok) Ui::event(Ui::EnrollOk, r.uid);
+    else Ui::event(Ui::EnrollFail, st == 200 ? (res["error"] | "") : "");
     if (!ok) log_w("Registro fallido: %s", res["error"] | "sin conexión");
   }
 }
@@ -329,6 +335,8 @@ void heartbeat() {
 
   maybeSetClock(res["server_time"] | 0u);
   g_disabled = !(res["is_active"] | true);
+  const char* devName = res["name"] | "";
+  if (*devName) setDeviceName(devName);
   Lock::setDefaultUnlockMs(res["unlock_ms"] | DEFAULT_UNLOCK_MS);
   // El servidor es la fuente de verdad: si se perdió un comando MQTT, el latido lo corrige.
   Lock::setLockdown(res["lockdown"] | false);

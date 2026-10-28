@@ -168,6 +168,9 @@ await as('service_role', null, () => q(`select public.fn_device_heartbeat('door0
 check('motivo inválido no sobrescribe', (await resetOf()) === 'brownout');
 await as('service_role', null, () => q(`select public.fn_device_heartbeat('door001')`));
 check('latido sin motivo conserva el último', (await resetOf()) === 'brownout');
+const hbName = await as('service_role', null, async () => (await q(`select public.fn_device_heartbeat('door001') r`))[0].r);
+const d1Name = (await q(`select name from devices where id = $1`, [d1.id]))[0].name;
+check('latido devuelve el nombre de la puerta (pantalla)', hbName.name === d1Name && !!d1Name, hbName);
 
 // ---- "mantener abierta" en el registro (migración log_hold_open) ----
 const holdLogId = await as('service_role', null, async () =>

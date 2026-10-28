@@ -12,6 +12,7 @@
 #include "config.h"
 #include "lock.h"
 #include "state.h"
+#include "ui.h"
 
 namespace {
 #if NFC_USE_SPI
@@ -92,6 +93,7 @@ void decide(const uint8_t* uid, uint8_t len, const char* hex) {
   bool granted = false, decided = false, triedOnline = false;
   uint32_t unlockMs = Lock::defaultUnlockMs();
   const char* reason = "";
+  char name[32] = "", srvReason[24] = "";
   uint32_t seq = ++s_seq;
 
   if (g_online) {
@@ -108,7 +110,11 @@ void decide(const uint8_t* uid, uint8_t len, const char* hex) {
       while (msDiff(millis(), t0) < (int32_t)ACCESS_ONLINE_TIMEOUT_MS) {
         esp_task_wdt_reset();
         if (xQueueReceive(g_accessResp, &resp, pdMS_TO_TICKS(40)) == pdTRUE && resp.seq == seq) {
-          if (resp.ok) { decided = true; granted = resp.granted; unlockMs = resp.unlockMs; }
+          if (resp.ok) {
+            decided = true; granted = resp.granted; unlockMs = resp.unlockMs;
+            strlcpy(name, resp.name, sizeof name);
+            strlcpy(srvReason, resp.reason, sizeof srvReason);
+          }
           break;
         }
       }
@@ -138,8 +144,10 @@ void decide(const uint8_t* uid, uint8_t len, const char* hex) {
   if (granted) {
     Lock::pulse(unlockMs);
     Feedback::signal(Feedback::Granted);
+    Ui::event(Ui::Granted, name, decided ? nullptr : "offline");
   } else {
     Feedback::signal(Feedback::Denied);
+    Ui::event(Ui::Denied, decided ? srvReason : reason, hex);
   }
 }
 
@@ -167,6 +175,7 @@ void onCard(const uint8_t* uid, uint8_t len) {
     strlcpy(r.session, session, sizeof r.session);
     xQueueSend(g_netQueue, &r, pdMS_TO_TICKS(100));
     Feedback::signal(Feedback::EnrollSent);
+    Ui::event(Ui::EnrollSent, hex);
     return;
   }
 
@@ -183,6 +192,7 @@ void exitButtonTick() {
       // La salida SIEMPRE se permite (también en lockdown y sin red): seguridad de las personas.
       Lock::pulse(Lock::defaultUnlockMs());
       Feedback::signal(Feedback::Granted);
+      Ui::event(Ui::ExitButton);
       Cache::pushEvent("exit_button", nullptr, true, nullptr);
     }
   }

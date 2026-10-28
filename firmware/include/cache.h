@@ -15,6 +15,7 @@ bool decide(const uint8_t* uid, uint8_t len, bool* admin, const char** reason);
 /** Reemplaza la lista (respuesta de device-ingest {type:"allowlist"}). Persiste de forma atómica. */
 bool replace(JsonArrayConst entries, const char* version, int utcOffsetMin);
 String version();
+int utcOffsetMin();   // desfase horario del sitio (minutos) para mostrar la hora local
 size_t size();
 
 // ---- cola de eventos offline ----

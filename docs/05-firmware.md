@@ -179,7 +179,27 @@ Un único **módulo de pared multivoltaje** entrega a la vez **3,3 V, 5 V y 12 V
 | LED rojo | GPIO 19 | igual |
 | Zumbador activo 5 V | GPIO 23 | GPIO → 1 kΩ → base 2N2222; emisor → GND; colector → (−) zumbador; (+) zumbador → 5 V |
 
-Pines evitados a propósito: 0, 2, 5, 12, 15 (arranque) y 6–11 (flash interna).
+Pines evitados a propósito: 0, 2, 5, 12 (arranque) y 6–11 (flash interna). El 15 solo se usa como CS de la pantalla.
+
+### Pantalla TFT 1,8" 128×160 (ST7735)
+Va por **SPI, en su propio bus (HSPI)**, separado del lector: pantalla y PN532 nunca se estorban. Aunque los pines digan SCL/SDA, **no es I2C**: SCL es el reloj y SDA el dato.
+
+| Pin de la pantalla | Va a | Nota |
+|---|---|---|
+| **GND** | GND de control | |
+| **VCC** | **+3,3 V** del módulo | |
+| **SCL** | **GPIO 14** | reloj SPI |
+| **SDA** | **GPIO 13** | datos SPI |
+| **RST** | **GPIO 16** | |
+| **DC** | **GPIO 17** | |
+| **CS** | **GPIO 15** | |
+| **BLK** | **+3,3 V** | luz de fondo siempre encendida |
+
+Qué muestra:
+- **En reposo:** nombre de la puerta y conexión, hora local y una barra de estado ("Acerque su tarjeta", "BLOQUEO TOTAL", "Puerta abierta · Cierra en 4:32", "Sin conexión").
+- **Durante 2,5 s tras cada evento:** "Bienvenido" con el nombre (verde), "Denegado" con el motivo y el UID (rojo), y el modo registro con cuenta atrás (azul).
+
+Si los colores salen cambiados o hay basura en los bordes, prueba `TFT_TAB INITR_GREENTAB` (o `INITR_REDTAB`) en [`config.h`](../firmware/include/config.h). Para usarla vertical: `TFT_ROTATION 0`. Sin pantalla: `DISPLAY_ENABLED 0`.
 
 ### Resumen pin a pin del ESP32
 | GPIO | Función | | GPIO | Función |
@@ -190,6 +210,7 @@ Pines evitados a propósito: 0, 2, 5, 12, 15 (arranque) y 6–11 (flash interna)
 | 32 / 33 | PN532 MISO / SS | | 18 / 19 | LED verde / rojo |
 | — | PN532 VCC ← 3,3 V del módulo | | 23 | Zumbador (vía transistor) |
 | VIN | 5 V del módulo de pared (el mismo que la bobina del relé) | | GND | punto único de masa |
+| 14 / 13 | Pantalla SCL / SDA | | 15 / 16 / 17 | Pantalla CS / RST / DC |
 
 ---
 

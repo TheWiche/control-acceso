@@ -181,6 +181,7 @@ bool replace(JsonArrayConst entries, const char* version, int utcOffsetMin) {
 
 String version() { Guard g; return String(s_version); }
 size_t size() { Guard g; return s_entries.size(); }
+int utcOffsetMin() { Guard g; return s_offset; }
 
 void pushEvent(const char* kind, const char* uidHex, bool granted, const char* reason) {
   Event e{};

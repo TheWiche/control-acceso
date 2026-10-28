@@ -58,6 +58,7 @@ void pulse(uint32_t ms) {
 }
 
 void holdOpenUntil(uint32_t epoch) { s_holdUntil = epoch; }
+uint32_t holdUntil() { return s_holdUntil; }
 
 // setLockdown / setDefaultUnlockMs solo se llaman desde la tarea de red: NVS sin concurrencia.
 void setLockdown(bool on) {
