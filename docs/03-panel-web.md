@@ -21,6 +21,22 @@ Antes de usarlo contra Supabase aplica también `supabase/migrations/20261026000
 3. Push a `main`: `.github/workflows/deploy.yml` compila con `VITE_BASE=/<repo>/` y publica. Hay que commitear `web/package-lock.json` (el workflow usa `npm ci`).
 4. En Supabase, añade `https://<usuario>.github.io/<repo>/` a *Redirect URLs*.
 
+## Tarjeta de la puerta: reglas de los botones
+El panel y el servidor aplican las mismas reglas; el servidor es el que decide, así que no se pueden saltar desde el navegador.
+
+| Situación | Qué pasa |
+|---|---|
+| Hay una orden en curso | **Todos los botones quedan bloqueados** hasta tener el estado nuevo |
+| La puerta ya está abierta (pulso, «mantener abierta» o salida activa) | **Abrir puerta** se desactiva y muestra «Puerta liberada · se cierra en m:ss» |
+| Bloqueo total activo | **Mantener abierta** no está disponible («Quita primero el bloqueo total»); activar el bloqueo **cierra** una puerta liberada |
+| Cerradura desconectada | **Abrir** y **Mantener abierta** no están disponibles |
+| Puerta ya liberada | **Mantener abierta** pasa a **Cambiar tiempo** (cuenta desde ahora) |
+
+- **Duración libre:** de **5 s a 4 h**, escrita en segundos, minutos u horas, además de los atajos (30 s, 1 min, 5, 15, 30 min, 1 h). Por encima de 5 min avisa del calentamiento del solenoide.
+- **«Desconectado»** aparece a los 45 s sin latido del ESP32 (el latido es cada 15 s).
+- **Telemetría:** señal, último latido, IP y versión del firmware, cuánto lleva encendida la cerradura y **el motivo del último reinicio** («caída de tensión» en rojo delata una fuente débil).
+- **«Mantener abierta» y los accesos con tarjeta o pase** aparecen en el registro; el primero con su duración.
+
 ## Estructura
 ```
 web/src/
@@ -45,7 +61,7 @@ Todas: `POST`, JWT del usuario, verifican `profiles.role = 'admin'`, responden J
 | Función | Body | Respuesta | Efecto |
 |---|---|---|---|
 | `unlock` | `{device_code}` | `{ok, command_id}` | `fn_authorize_member_unlock` + fila en `device_commands` + MQTT `unlock`. El ESP32 hace ACK y la fila pasa a `acked`. |
-| `device-control` | `{device_code, action, minutes?}`, `action` ∈ `lockdown_on`, `lockdown_off`, `hold_open`, `release` | `{ok}` | Actualiza `devices.lockdown` / `hold_open_until` y publica el comando MQTT. |
+| `device-control` | `{device_code, action, seconds?}`, `action` ∈ `lockdown_on`, `lockdown_off`, `hold_open`, `release` (`minutes` sigue aceptándose por compatibilidad) | `{ok, delivered, hold_open_until}` | Valida en el servidor, actualiza `devices.lockdown` / `hold_open_until`, deja `hold_open` en el registro (`fn_log_hold_open`) y publica el comando MQTT con la hora absoluta de cierre. |
 | `enroll-start` | `{device_code, kind}` | `{ok, session}` (fila de `enrollment_sessions`) | Expira sesiones viejas, inserta sesión `waiting` (60 s), MQTT `enroll_start`. El ESP32 reporta la UID por HTTPS y `fn_enroll_capture` la guarda. |
 | `enroll-cancel` | `{session_id}` | `{ok}` | Sesión → `cancelled`, MQTT `enroll_cancel`. |
 

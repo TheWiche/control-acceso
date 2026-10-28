@@ -1,291 +1,230 @@
 # Fase 4/5 — Firmware ESP32, conexiones y montaje
 
-Código: [`firmware/`](../firmware/) — PlatformIO, plataforma `espressif32@7.0.1`, framework Arduino-ESP32 **2.0.17** fijado (`3.20017.241212`), PN532 1.3.4, BusIO 1.17.4, ArduinoJson 7.2.1.
-MQTT (esp-mqtt), HTTPS (esp_http_client), LittleFS, NVS y mbedTLS vienen en el framework: no hay más dependencias.
-Compila con 0 errores (RAM 14,7 %, flash 55,9 %). **Aún no se ha probado con el lector, el relé y el solenoide conectados.**
+Código: [`firmware/`](../firmware/). PlatformIO, plataforma `espressif32@7.0.1`, framework Arduino-ESP32 **2.0.17** fijado (`3.20017.241212`).
+Librerías fijadas: PN532 1.3.4, BusIO 1.17.4, ArduinoJson 7.2.1, Adafruit GFX 1.12.6 y Adafruit ST7735 1.11.0.
+MQTT (esp-mqtt), HTTPS (esp_http_client), LittleFS, NVS y mbedTLS vienen en el framework.
+
+**Estado:** firmware **1.3.0**, compila con 0 errores (RAM 14,8 %, flash 57,3 %).
+
+| Componente | ¿Probado en el hardware real? |
+|---|---|
+| Lector PN532 por SPI | **Sí**: lee y registra tarjetas |
+| Cerradura con MOSFET IRFZ44N y driver Q1/Q2 | **Sí**: abre y cierra desde el panel y con el llavero |
+| LEDs | **Sí** |
+| Pantalla TFT | firmware cargado; falta confirmarla montada |
+
+> **Conexiones una a una:** [07-conexiones.md](07-conexiones.md). Es la hoja de montaje. Este documento explica **por qué** cada parte va así.
 
 ---
 
 ## 1. Materiales
-
-| # | Pieza | Especificación | Nota |
-|---|---|---|---|
-| 1 | ESP32 DevKit | ESP32-WROOM-32, 4 MB flash, USB CH340/CP2102 | detectado en tu PC: ESP32-D0WD-V3, 4 MB, COM3 |
-| 2 | Lector NFC | PN532 (Elechouse V3 o clon rojo) | modo I2C |
-| 3 | Relé suelto de 5 patas | bobina **5 V DC** (p. ej. Songle SRD-05VDC-SL-C, ~70 Ω / ~70 mA), contactos ≥ 10 A 30 V DC | manejado por transistor NPN, **activo en HIGH** (§3) |
-| 3b | Transistor relé | 2N2222A / PN2222A (o BC337) | uno más aparte del del zumbador |
-| 4 | Cerradura | Solenoide 12 V DC, *fail-secure* (bloquea sin corriente) | anota su corriente (típico 0,5–1 A) |
-| 5 | Diodos | 2×: **1N4007** en el solenoide (**1N5408** si pasa de 1 A) + **1N4007 o 1N4148** en la bobina del relé | protección *flyback*, ambos obligatorios |
-| 6 | Módulo de pared multivoltaje | salidas simultáneas **3,3 V, 5 V y 12 V** con GND común | comprueba con el multímetro cada salida antes de conectar nada; las corrientes máximas de cada riel están en su etiqueta |
-| 8 | Condensadores | 1× 470–1000 µF/25 V, 1× 10 µF, 1× 100 nF | estabilidad ante picos del solenoide |
-| 9 | Resistencias | 1× 10 kΩ, 2× 330 Ω, 2× 1 kΩ | pull-down del relé, LEDs, bases de los dos transistores |
-| 10 | Interfaz | pulsador NA (salida), LED verde y rojo, zumbador activo 5 V + 2N2222, reed switch (opcional) | |
+| Pieza | Especificación | Nota |
+|---|---|---|
+| ESP32 DevKit | ESP32-WROOM-32, 4 MB, USB CH340 | el tuyo: ESP32-D0WD-V3, 4 MB |
+| Lector NFC | PN532 (placa roja «PN532 NFC RFID V3») | **en modo SPI** (§2) |
+| Pantalla | TFT 1,8" 128×160, chip ST7735 | SPI en bus propio (§6) |
+| Cerradura | solenoide 12 V DC, *fail-secure* | anota su corriente (típico 0,5–1 A) |
+| Conmutación | MOSFET **IRFZ44N** + 2× **2N2222A** | o un **IRLZ44N** solo (§3.3) |
+| Protección | diodo **1N4007**, condensador **1000 µF / 25 V** | obligatorios |
+| Resistencias | 1× 1 kΩ, 4× 10 kΩ, 2× 330 Ω | **mídelas antes de soldar** |
+| Indicadores | LED verde, LED rojo | |
+| Alimentación | módulo de pared multivoltaje: **3,3 V, 5 V y 12 V** con GND común | §4 |
+| Opcionales | pulsador de salida, sensor magnético de puerta, zumbador activo 5 V + 2N2222A | |
 
 ---
 
-## 2. ESP32 ↔ PN532 (SPI)
+## 2. Lector PN532 (SPI)
 
-> **Por qué SPI y no I2C.** Por I2C el PN532 retiene la línea SCL mientras procesa (*clock stretching*) y el
-> controlador I2C del ESP32 se queda en timeout (`i2cRead returned Error 263`, SCL medido en 0), sobre todo con el
-> ruido del solenoide. Por SPI no existe ese problema. El firmware sigue admitiendo I2C con `NFC_USE_SPI 0` en
-> [`config.h`](../firmware/include/config.h).
+> **Por qué SPI y no I2C.** Por I2C, el PN532 retiene la línea SCL mientras procesa (*clock stretching*) y el
+> controlador I2C del ESP32 se queda en timeout (`i2cRead returned Error 263`, con SCL medido en 0), sobre todo
+> con el ruido del solenoide. Por SPI ese problema no existe. El firmware sigue admitiendo I2C con
+> `NFC_USE_SPI 0` en [`config.h`](../firmware/include/config.h).
 
-### 2.1 Interruptor de modo
-El PN532 tiene un interruptor de 2 palancas, rotulado **ON** y **1 2**, y al lado una tabla impresa (HSU / I2C / SPI).
-Las palancas se leen **al encender**: cámbialas siempre con la placa desconectada.
-
-| Modo | Palanca 1 | Palanca 2 |
-|---|---|---|
-| HSU / UART | OFF | OFF |
-| I2C | ON | OFF |
-| **SPI ← este proyecto** | **OFF** (lejos de «ON») | **ON** (hacia «ON») |
-
-### 2.2 Cableado (placa roja «PN532 NFC RFID V3»)
-Las señales SPI están en el **conector de 8 pines** del lateral (SCK, MISO, MOSI, SS, VCC, GND, IRQ, RSTO).
-VCC y GND pueden seguir en el conector de 4 pines: son los mismos.
-
-| PN532 | ESP32 | Nota |
-|---|---|---|
-| **VCC** | **+3,3 V** del módulo de pared | **3,3 V, nunca 5 V** |
-| **GND** | **GND** común | |
-| **SCK** | **GPIO 22** | el cable que iba a SCL |
-| **MOSI** | **GPIO 21** | el cable que iba a SDA |
-| **MISO** | **GPIO 32** | cable nuevo |
-| **SS** | **GPIO 33** | cable nuevo |
-| **IRQ** | **GPIO 4** | el firmware detecta tarjetas por interrupción, sin bloquear |
-| RSTO | sin conectar | es una salida de reset, no se usa |
-| SCL / SDA (conector de 4 pines) | **sin conectar** | solo se usan en modo I2C |
-
-Junto a los pines VCC/GND del PN532: **100 nF + 10 µF** en paralelo (VCC a GND).
-Lleva los cables del lector **cortos (< 20 cm) y lejos** de los del relé y el solenoide.
-
-Log esperado al arrancar: `PN532 firmware 1.6`. Si sale `PN532 no responde por SPI`, revisa el interruptor y los 4 cables de señal.
+- **Interruptor de modo:** **palanca 1 OFF, palanca 2 ON** (fila «SPI 0 1» de la tabla impresa). Solo se lee al encender.
+- **Cables:**
+  - SCK → D22
+  - MOSI → D21
+  - MISO → D32
+  - SS → D33
+  - IRQ → D4
+  - VCC → **3,3 V** (nunca 5 V)
+  - GND
+- **El firmware detecta las tarjetas por interrupción (IRQ):** la tarea del lector no se queda esperando.
+- **Recuperación:** si el lector deja de responder, se reintenta cada 5 s. **El lector nunca reinicia el ESP32**: la cerradura y el botón de salida siguen funcionando aunque el lector falle.
+- Log esperado: `PN532 firmware 1.6`.
 
 ---
 
-## 3. ESP32 ↔ relé suelto con transistor NPN (lado de control)
+## 3. Mando de la cerradura
 
-El GPIO **no puede** mover la bobina directamente: da 3,3 V y ~20 mA, la bobina pide 5 V y ~70 mA. Un NPN hace de interruptor del lado de masa de la bobina. Lógica **activa en HIGH**: `RELAY_ACTIVE_LOW 0` en [`config.h`](../firmware/include/config.h) (ya configurado).
+### 3.1 Por qué un MOSFET (y no el relé)
+El relé de 5 patas con un 2N2222A también funciona, pero tiene contactos mecánicos que se desgastan y hacen chispa, y su bobina añade carga a los 5 V. Un MOSFET conmuta el solenoide **sin piezas móviles**, en silencio y sin arco.
 
-| GPIO 26 | Transistor | Bobina | Contacto COM–NO | Cerradura |
+**El solenoide va por el lado de GND** (*low-side*):
+- +12 V → solenoide → Drain.
+- Source → GND.
+- El MOSFET abre o cierra el retorno a tierra.
+
+### 3.2 Por qué el IRFZ44N necesita dos transistores delante
+| MOSFET | Voltaje de puerta para conducir del todo | Con los 3,3 V del ESP32 |
+|---|---|---|
+| **IRFZ44N** | **10 V** (puede no empezar a conducir hasta 4 V) | **no conduce**: lo medimos, 11,8 V entre D y S y el solenoide quieto |
+| **IRLZ44N** ("L" de lógica) | 3–5 V | conduce |
+
+Con el IRFZ44N, **Q1 y Q2** (2N2222A) ponen **12 V en la puerta**. Son dos etapas inversoras seguidas, así que la lógica **no se invierte**: D26 en alto abre (`RELAY_ACTIVE_LOW 0`, sin cambios en el código).
+
+| D26 | Q1 | Q2 | Puerta | Solenoide |
 |---|---|---|---|---|
-| **HIGH** (3,3 V) | conduce | activada (clic) | cerrado | **abierta** |
-| **LOW** / sin programa / reinicio | cortado | en reposo | abierto | **bloqueada** |
+| alto | conduce | apagado | 12 V (por R5) | **abre** |
+| bajo, arranque o reinicio | apagado (R2 a GND) | conduce (por R3 + R4) | 0 V | **cerrado** |
 
-### 3.1 Identificar las 5 patas del relé (multímetro)
-Típico SRD-05VDC-SL-C visto desde abajo: 2 patas de bobina, COM, NO y NC. Confírmalo con el relé suelto:
-1. **Bobina:** las dos patas que marcan **~70 Ω** entre sí (≈ 55–90 Ω). No tienen polaridad propia; la fija el diodo.
-2. **COM y NC:** las dos que marcan **continuidad (0 Ω)** en reposo.
-3. **NO:** la que queda; sin continuidad con COM en reposo. Aplica 5 V a la bobina: COM–NO pasa a 0 Ω y COM–NC se abre.
+Esto es **seguro ante fallos**: mientras el ESP32 arranca, se reinicia o se programa, D26 queda flotando, R2 mantiene Q1 apagado y la puerta **sigue cerrada**.
 
-### 3.2 Identificar las patas del transistor
-Las marcas varían: **PN2222A** (cara plana hacia ti, patas abajo) = **E-B-C**; **P2N2222A** (ON Semi) = **C-B-E**; **BC337** = **C-B-E**. Si dudas: multímetro en modo diodo, punta roja en una pata y la negra en las otras dos. La pata que da ~0,6–0,7 V hacia **las dos** es la **base**. De las otras dos, el **emisor** marca un poco más que el colector.
+Que el IRFZ44N se active con un solo NPN es posible, pero la lógica quedaría invertida y la puerta se abriría un instante en cada reinicio. Por eso no se hace así.
 
-### 3.3 Conexiones
+### 3.3 Variante más simple: IRLZ44N
+Con un IRLZ44N sobran Q1, Q2, R3, R4 y R5:
+- D26 → 1 kΩ → G.
+- 10 kΩ de G a GND.
+- Mismas patas G · D · S y mismo firmware.
 
-| Desde | Hasta | Por qué |
-|---|---|---|
-| **GPIO 26** | resistencia **1 kΩ** → **base** del NPN | limita la corriente de base a ~2,6 mA (de sobra para saturar ~70 mA) |
-| **Base** del NPN | resistencia **10 kΩ** → **GND** | **pull-down**: mantiene el transistor cortado (relé en reposo, puerta bloqueada) mientras el ESP32 arranca, se reinicia o se programa y el GPIO queda flotando |
-| **Emisor** del NPN | **GND** (punto único de masa, §5) | |
-| **Colector** del NPN | **pata 2 de la bobina** | |
-| **Pata 1 de la bobina** | **+5 V del módulo de pared** | **no** desde el 3V3 del ESP32 ni desde su pin 5V si está alimentado por USB |
-| Diodo **1N4007 / 1N4148** de bobina | **en paralelo con la bobina**: **franja (cátodo) → pata 1 (+5 V)**, ánodo → pata 2 (colector) | sin él, el pico de la bobina al apagar (>50 V) **destruye el transistor** en pocos ciclos |
-
-```
-            +5 V (módulo de pared)
-               │
-               ├──────────┐
-               │        ──┴──  1N4007/1N4148
-          ┌────┴────┐    ▲     franja (cátodo) arriba, hacia +5 V
-          │ BOBINA  │    │
-          │  relé   │    │
-          └────┬────┘    │
-               ├─────────┘
-               │ colector
- GPIO 26 ──[1 kΩ]──┬── base   NPN 2N2222A
-                   │       emisor
-                [10 kΩ]       │
-                   │          │
- GND ──────────────┴──────────┴─── punto único de masa
-```
-
-> Este diodo de bobina es **adicional** al 1N4007 del solenoide (§4): uno protege el transistor, el otro el contacto del relé y la tierra.
-
-**Si en el futuro usas un módulo relé con optoacoplador** (activo en LOW): cambia `RELAY_ACTIVE_LOW` a `1`, quita el jumper JD-VCC (VCC → 3V3, JD-VCC → 5 V) y cambia el pull-down por un **pull-up de 10 kΩ de IN a 3V3**.
+### 3.4 Diodo y condensador
+- **Diodo 1N4007 en paralelo con el solenoide,** con la **franja hacia el +12 V**. Al apagarse, la bobina del solenoide genera un pico de cientos de voltios. El diodo lo descarga en la propia bobina. Sin él, ese pico destruye el MOSFET y reinicia el ESP32.
+- **Condensador de 1000 µF** entre +12 V y GND de potencia. Absorbe el arranque del solenoide, que pide mucha corriente de golpe.
 
 ---
 
-## 4. Etapa de potencia: relé ↔ solenoide ↔ riel de 12 V
+## 4. Alimentación y tierras
+Un único **módulo de pared** alimenta todo:
+- **12 V:** solenoide y puerta del MOSFET.
+- **5 V:** VIN del ESP32.
+- **3,3 V:** PN532 y pantalla.
 
-| Desde | Hasta | Calibre |
-|---|---|---|
-| Módulo, salida **+12 V** | Relé **COM** | AWG 20–22 |
-| Relé **NO** (normalmente abierto) | Solenoide **+** (cable rojo) | AWG 20–22 |
-| Solenoide **−** (cable negro) | Módulo, **GND** | AWG 20–22 |
-| Relé **NC** | **sin conectar** | con un solenoide *fail-secure* |
-
-### Diodo 1N4007 (dónde va exactamente)
-**En paralelo con el solenoide, polarizado en inversa, soldado en los terminales del solenoide (lo más cerca posible de la bobina):**
-- **Cátodo** (extremo con la **franja** gris/blanca) → terminal **+** del solenoide (el que va al NO del relé).
-- **Ánodo** (extremo sin franja) → terminal **−** del solenoide (el que va al −12 V).
-
-Con el relé cerrado, el diodo queda en inversa y no conduce. Al abrirse el relé, la bobina genera un pico negativo de cientos de voltios. El diodo lo cortocircuita a ~0,7 V dentro de la propia bobina. Sin él, ese pico salta como arco en el contacto del relé y viaja por la tierra: es lo que **reinicia el ESP32 y cuelga el PN532 al cerrar la puerta**.
-
-**No lo pongas** sobre los contactos del relé ni al revés (al revés es un cortocircuito directo de la fuente al activar el relé).
-
-Añade además un **condensador de 470–1000 µF/25 V** entre +12 V y −12 V, junto al relé (respetando la polaridad). Absorbe la caída de tensión al arrancar el solenoide.
+- **Dos tierras que solo se unen en el módulo.** El **GND de potencia** (Source del MOSFET, − del condensador) y el **GND de control** (ESP32, PN532, pantalla, Q1, Q2 y LEDs) van **cada uno con su propio cable** al borne GND del módulo. Así la corriente del solenoide no pasa por los cables del ESP32 ni del lector, y su pico no "levanta" la tierra de la lógica.
+- **El PN532 y la pantalla van a los 3,3 V del módulo,** no al pin 3V3 del ESP32. El regulador del ESP32 es pequeño y el PN532 llega a ~150 mA al leer.
+- **Si el módulo se apaga o el ESP32 se reinicia al abrir,** el módulo no da la corriente del solenoide. Alimenta el solenoide con un **adaptador de 12 V aparte** (variantes en [07 §13](07-conexiones.md)). El panel muestra el motivo del último reinicio: «caída de tensión» delata la fuente.
+- **Ciclo de trabajo del solenoide:** la mayoría no está hecha para estar energizada mucho tiempo y se calienta. Los pulsos de 3 s están bien. Con **«Mantener abierta» largo** (el panel avisa a partir de 5 min), revisa su ficha.
+- **No alimentes el ESP32 por USB y por VIN a la vez.** Para programar, quita el cable de VIN.
 
 ---
 
-## 5. Alimentación y tierra común
-
-Un único **módulo de pared multivoltaje** entrega a la vez **3,3 V, 5 V y 12 V** con una **GND común**. No hay reductor que ajustar.
-
-```
-   ┌──────────────── MÓDULO DE PARED ────────────────┐
-   │   +12V          +5V          +3,3V         GND   │
-   └────┬─────────────┬─────────────┬────────────┬────┘
-        │             │             │            │
-     Relé COM     ESP32 VIN     PN532 VCC        │
-     Relé NO ──┬─ Solenoide +  (el 3V3 del       │
-               │  [1N4007: franja aquí]  ESP32   │
-               └─ Solenoide − ─── no se usa) ────┤  retorno directo del solenoide
-                                                 │
-     bobina del relé (pata 1) ← +5 V             │
-                                                 │
-   ESP32 GND ─ PN532 GND ─ emisor NPN ─ 10 kΩ pull-down ─ LEDs/botón ─┘  (un solo punto de masa)
-
-   [470–1000 µF entre +12V y GND, junto al relé]
-```
-
-- **PN532 a 3,3 V:** usa **un solo** riel de 3,3 V (el del módulo). El regulador del ESP32 es de poca corriente y el PN532 llega a ~150 mA al leer.
-- **Tierra común:** ya la une el módulo. Haz la unión en **un solo punto** (el borne GND del módulo) y llega a él con un cable por cada bloque: ESP32/PN532/transistor por un lado y el retorno del solenoide por otro.
-- **La corriente del solenoide vuelve por su propio cable** directamente al GND del módulo. No la hagas pasar por los cables de GND del ESP32 ni del PN532: así el pico no "levanta" la tierra de la lógica.
-- **Corrientes:** suma lo que pides al riel de 5 V (ESP32 ≈ 250 mA, con picos de ~500 mA al usar WiFi, + bobina del relé ≈ 70–90 mA + zumbador). Si la etiqueta del módulo da menos en 5 V, el ESP32 se reiniciará al activar el relé.
-- **Solenoide: ciclo de trabajo.** La mayoría de solenoides de 12 V no están hechos para estar energizados de forma continua y se calientan. Los pulsos de 3 s están bien; **evita «Mantener puerta abierta» durante muchos minutos** salvo que su ficha indique servicio continuo.
-- **Antes de conectar el ESP32, mide** con el multímetro la salida de 5 V (debe dar 4,8–5,2 V) y la de 3,3 V.
-- **No alimentes el ESP32 por USB y por VIN a la vez** en la instalación final. Para programar, usa solo el USB o desconecta VIN.
-
----
-
-## 6. Interfaz de usuario
-
+## 5. LEDs y opcionales
 | Elemento | ESP32 | Conexión |
 |---|---|---|
-| Pulsador de salida (NA) | GPIO 27 | un terminal a GPIO 27, el otro a GND (pull-up interno) |
-| Reed switch (opcional) | GPIO 25 | a GND; cerrado = puerta cerrada. Si no lo usas: `PIN_DOOR_SENSOR -1` |
-| LED verde | GPIO 18 | GPIO → 330 Ω → ánodo (pata larga); cátodo → GND |
-| LED rojo | GPIO 19 | igual |
-| Zumbador activo 5 V | GPIO 23 | GPIO → 1 kΩ → base 2N2222; emisor → GND; colector → (−) zumbador; (+) zumbador → 5 V |
+| LED verde | D18 | D18 → 330 Ω → pata larga; pata corta → GND |
+| LED rojo | D19 | igual |
+| Pulsador de salida (opcional) | D27 | a GND; abre siempre, también en bloqueo total y sin red |
+| Sensor de puerta (opcional) | D25 | a GND; cerrado = puerta cerrada. Sin él: `PIN_DOOR_SENSOR -1` |
+| Zumbador activo 5 V (opcional) | D23 | D23 → 1 kΩ → base de un 2N2222A; emisor → GND; colector → − del zumbador; + → 5 V |
 
-Pines evitados a propósito: 0, 2, 5, 12 (arranque) y 6–11 (flash interna). El 15 solo se usa como CS de la pantalla.
+Pines que se evitan a propósito: 0, 2, 5 y 12 (arranque) y 6–11 (flash interna). El 15 solo se usa como CS de la pantalla.
 
-### Pantalla TFT 1,8" 128×160 (ST7735)
-Va por **SPI, en su propio bus (HSPI)**, separado del lector: pantalla y PN532 nunca se estorban. Aunque los pines digan SCL/SDA, **no es I2C**: SCL es el reloj y SDA el dato.
+---
 
-| Pin de la pantalla | Va a | Nota |
-|---|---|---|
-| **GND** | GND de control | |
-| **VCC** | **+3,3 V** del módulo | |
-| **SCL** | **GPIO 14** | reloj SPI |
-| **SDA** | **GPIO 13** | datos SPI |
-| **RST** | **GPIO 16** | |
-| **DC** | **GPIO 17** | |
-| **CS** | **GPIO 15** | |
-| **BLK** | **+3,3 V** | luz de fondo siempre encendida |
+## 6. Pantalla TFT 1,8" 128×160 (ST7735)
+Va por **SPI en su propio bus (HSPI)**:
+- SCL → D14
+- SDA → D13
+- CS → D15
+- DC → D17
+- RST → D16
+- VCC y BLK → 3,3 V
+- GND
 
-Qué muestra:
-- **En reposo:** nombre de la puerta y conexión, hora local y una barra de estado ("Acerque su tarjeta", "BLOQUEO TOTAL", "Puerta abierta · Cierra en 4:32", "Sin conexión").
-- **Durante 2,5 s tras cada evento:** "Bienvenido" con el nombre (verde), "Denegado" con el motivo y el UID (rojo), y el modo registro con cuenta atrás (azul).
+Aunque los pines digan SCL y SDA, **no es I2C**. El lector usa el otro bus (VSPI), así que **nunca comparten bus** y no hacen falta cerrojos entre tareas.
 
-Si los colores salen cambiados o hay basura en los bordes, prueba `TFT_TAB INITR_GREENTAB` (o `INITR_REDTAB`) en [`config.h`](../firmware/include/config.h). Para usarla vertical: `TFT_ROTATION 0`. Sin pantalla: `DISPLAY_ENABLED 0`.
+**Qué muestra:**
+- **En reposo:** nombre de la puerta y conexión, **hora local** y una barra de estado:
+  - "Acerque su tarjeta"
+  - "BLOQUEO TOTAL"
+  - "Puerta abierta · Cierra en 4:32"
+  - "Modo registro"
+  - "Sin conexión · Funciona en modo local"
+- **2,5 s tras cada evento:**
+  - **Verde:** "Bienvenido" + nombre de la persona.
+  - **Rojo:** "Denegado" + motivo ("Fuera de horario", "Tarjeta no registrada"…) + UID.
+  - **Azul:** modo registro, con cuenta atrás.
+  - **Verde:** apertura desde la app o botón de salida.
 
-### Resumen pin a pin del ESP32
-| GPIO | Función | | GPIO | Función |
-|---|---|---|---|---|
-| 21 | PN532 MOSI | | 26 | 1 kΩ → base NPN del relé (10 kΩ base → GND); HIGH = abre |
-| 22 | PN532 SCK | | 27 | Pulsador de salida |
-| 4 | PN532 IRQ | | 25 | Reed switch |
-| 32 / 33 | PN532 MISO / SS | | 18 / 19 | LED verde / rojo |
-| — | PN532 VCC ← 3,3 V del módulo | | 23 | Zumbador (vía transistor) |
-| VIN | 5 V del módulo de pared (el mismo que la bobina del relé) | | GND | punto único de masa |
-| 14 / 13 | Pantalla SCL / SDA | | 15 / 16 / 17 | Pantalla CS / RST / DC |
+Si los colores salen cambiados o hay basura en los bordes, cambia `TFT_TAB` a `INITR_GREENTAB` o `INITR_REDTAB`. Para usarla vertical, `TFT_ROTATION 0`. Sin pantalla, `DISPLAY_ENABLED 0`. Todo en [`config.h`](../firmware/include/config.h).
 
 ---
 
 ## 7. Compilar y cargar
-
 ```bash
 cd firmware
-cp include/secrets.example.h include/secrets.h      # y rellénalo (docs/06, paso 7)
+cp include/secrets.example.h include/secrets.h      # y rellénalo (docs/06, paso E2)
 pio run                                              # compilar
-pio run -t upload --upload-port COM3                 # cargar (tu ESP32 está en COM3)
+pio run -t upload --upload-port COM3                 # cargar (quita antes el cable de VIN)
 pio device monitor -p COM3                           # ver el log (115200 baudios). Salir: Ctrl+C
 ```
-Si la carga se queda en `Connecting....`, mantén pulsado **BOOT** en el ESP32 hasta que empiece a escribir.
+Si la carga se queda en `Connecting....`, mantén pulsado **BOOT** en el ESP32 hasta que empiece a escribir. Si COM3 aparece "ocupado", cierra el monitor serie que tengas abierto.
 
 Log esperado al arrancar:
 ```
-Control de Acceso 1.0.0 — dispositivo puerta01x
-Caché: 0 UIDs (versión ), 0 eventos pendientes
+Control de Acceso 1.3.0 — dispositivo puerta01x
+Motivo del arranque: power_on
+Relé DESACTIVADO (GPIO 26 = 0)
+Caché: N UIDs (versión …), 0 eventos pendientes
 PN532 firmware 1.6
 WiFi conectado: 192.168.x.x  RSSI -5x
 MQTT conectado
-Lista blanca sincronizada: N UIDs (heap libre ...)
+Lista blanca sincronizada: N UIDs (heap libre …)
 ```
+En el log, "Relé" es la salida que gobierna la cerradura (D26), aunque ahora sea un MOSFET.
 
-### Orden de prueba en banco (no instales en la puerta hasta pasar los 5)
-1. **Solo ESP32 por USB**: carga y mira el log (WiFi y MQTT conectados, la puerta aparece **En línea** en el panel).
-2. **+ PN532**: debe salir `PN532 firmware 1.6`. Acerca una tarjeta: verás la alerta roja "Tarjeta no registrada" en el panel.
-3. **+ relé sin solenoide**: al encender, el relé **no** debe hacer clic (pull-down OK). Botón "Abrir puerta" en el panel → clic, LED verde 3 s y continuidad COM–NO con el multímetro; al terminar, nuevo clic y COM–NO abierto. Si el relé queda activado al arrancar o nunca se activa, revisa `RELAY_ACTIVE_LOW 0` y las patas E-B-C del transistor.
-4. **+ 12 V y solenoide (con diodo)**: abrir/cerrar 20 veces seguidas sin que el ESP32 se reinicie (mira el monitor).
-5. **Offline**: registra un llavero, espera 1 min, desconecta el router: el llavero debe seguir abriendo (LED rojo destella cada 3 s = sin red).
+**Diagnóstico del pin de la cerradura:** en cada apertura el firmware lee el nivel real de D26. Si ves `Relé ACTIVADO pero GPIO 26 lee 0`, algo externo tira el pin a GND (cortocircuito). Si sale `Relé ACTIVADO (GPIO 26 = 1)` y la cerradura no se mueve, el fallo está en el driver o el MOSFET.
+
+### Orden de prueba en banco
+Sigue [07 §10–§11](07-conexiones.md):
+1. Revisión con el multímetro.
+2. Encendido **sin que el solenoide se active**.
+3. Abrir desde el panel.
+4. Llavero registrado.
+5. Tarjeta sin registrar.
+6. Mantener abierta.
+7. Medida D–S < 0,3 V.
 
 ---
 
 ## 8. Diseño del firmware
-
 ```
- Núcleo 1 — "io" (prio 4): relé, LEDs, zumbador y botón de salida cada 10 ms (nada la bloquea)
- Núcleo 1 — "reader" (prio 3)                     Núcleo 0 — "net" (prio 2)
- PN532 por IRQ (no bloquea)                        WiFi no bloqueante + reintento cada 20 s
- anti-rebote de la misma tarjeta (2,5 s)           esp-mqtt: tarea propia, TLS, reconexión sola, LWT
- ¿modo registro? → envía UID a la web              HTTPS persistente a device-ingest (bundle de CAs)
- ¿online? → pregunta al servidor (≤ 2,5 s)  ───►   access / enroll_read / ack / heartbeat / allowlist / events
- si no hay respuesta → decide la CACHÉ             comandos MQTT firmados → HMAC, exp, anti-replay
-                                                  latido 15 s (y al cambiar el relé): hora, lockdown, hold-open, versión de lista, motivo del último reinicio
- watchdog 30 s                                     sube la cola offline cada 15 s
+ Núcleo 1 — "io" (prio 4): salida de la cerradura, LEDs, zumbador y botón de salida cada 10 ms (nada la bloquea)
+ Núcleo 1 — "reader" (prio 3): PN532 por IRQ, anti-rebote de la misma tarjeta (2,5 s), modo registro,
+                               decisión de acceso (servidor ≤ 2,5 s; si no, la caché)
+ Núcleo 1 — "ui" (prio 1): pantalla; recibe los eventos por una cola sin bloqueo
+ Núcleo 0 — "net" (prio 2): WiFi no bloqueante · esp-mqtt (TLS, reconexión, LWT) · HTTPS persistente a device-ingest
+                            latido cada 15 s y al cambiar la salida · comandos MQTT firmados · cola offline cada 15 s
+ Watchdog de 30 s sobre io, reader y net
 ```
 
-- **Decisión de acceso:** con red, decide el servidor (revocación instantánea, log en vivo). Si no responde en 2,5 s o no hay red, decide la caché. Mientras espera, el relé, los LEDs y el botón de salida siguen respondiendo.
-- **Caché offline (LittleFS):** hasta **400 UIDs** con vigencia, días, ventana horaria y desfase horario del sitio. Se escribe de forma atómica (`.tmp` + `rename`) y se re-sincroniza cuando cambia la huella que trae el latido: una revocación llega a la caché en ≤ 15 s.
+- **Decisión de acceso:** con red, decide el servidor (revocación instantánea, registro en vivo y nombre de la persona para la pantalla). Si no responde en 2,5 s o no hay red, decide la caché.
+- **Caché offline (LittleFS):** hasta **400 UIDs** con vigencia, días, ventana horaria y desfase horario del sitio. Se escribe de forma atómica y se re-sincroniza cuando cambia la huella que trae el latido: una revocación llega a la caché en ≤ 15 s.
 - **Cola offline:** hasta 200 eventos en flash. Se suben al volver la red con su hora real (`meta.offline = true`).
-- **Comandos** (`acc/v1/<code>/cmd`): `unlock`, `hold_open`, `release`, `lockdown_on/off`, `enroll_start/cancel`. Se verifican con HMAC-SHA256, ventana `iat/exp` ±30 s e id no repetido, y se confirman por HTTPS.
-- **El servidor manda:** el latido devuelve lockdown y mantener-abierta. Un comando MQTT perdido se corrige en ≤ 60 s.
-- **Recuperación:** watchdog de 30 s. El PN532 se comprueba cada 60 s; si deja de responder, el firmware libera el bus I2C y reintenta cada 5 s. **El lector nunca reinicia el ESP32**: la cerradura y el botón de salida siguen funcionando aunque el lector falle. Mientras el solenoide actúa (y 1,5 s después) no se toca el I2C.
+- **Comandos** (`acc/v1/<code>/cmd`): `unlock`, `hold_open` (con la hora absoluta de cierre), `release`, `lockdown_on/off` y `enroll_start/cancel`. Se verifican con HMAC-SHA256, ventana `iat/exp` ±30 s e id no repetido, y se confirman por HTTPS.
+- **El servidor manda:** el latido devuelve bloqueo total, "mantener abierta" y el nombre de la puerta. Un comando MQTT perdido se corrige en ≤ 15 s.
+- **Presencia:** latido cada 15 s; el servidor marca la puerta desconectada tras 45 s sin latido. El latido informa también del **motivo del último arranque** (normal, caída de tensión, watchdog…).
 
-### Señales
+### Señales de los LEDs
 | LEDs / zumbador | Significado |
 |---|---|
-| Verde fijo + bip | abierto |
-| Rojo 1 s + 3 bips | denegado |
-| Verde/rojo alternando | modo registro: acerca la tarjeta |
-| Verde parpadeando + 2 bips | tarjeta registrada |
-| Rojo 1 Hz | bloqueo total |
+| Destello verde cada 5 s | normal, en línea |
 | Destello rojo cada 3 s | sin conexión (funciona con la caché) |
-| Destello verde cada 5 s | normal |
+| Verde fijo | puerta abierta |
+| Verde 1,5 s + bip | acceso concedido |
+| Rojo 1,2 s + 3 bips | denegado |
+| Verde y rojo alternando | modo registro: acerca la tarjeta |
+| Rojo 1 vez por segundo | bloqueo total |
 
 ## 9. Comportamiento ante fallos y límites
-
 | Situación | Qué pasa |
 |---|---|
-| Sin internet | Tarjetas autorizadas abren con la caché. Pases de invitado y apertura remota no (el PIN se valida en el servidor). |
-| Corte de luz | Cerradura **bloqueada** (fail-secure). Lockdown y caché persisten. |
-| Arranque sin internet | Sin reloj con batería: hasta tener hora solo abren credenciales sin restricción horaria y admins (añade un DS3231 si lo necesitas). |
-| Bloqueo total | Solo admins. **El botón de salida siempre abre.** |
-| Comando con firma mala / vencido / repetido | Se ignora. |
+| Sin internet | Las tarjetas autorizadas abren con la caché. Los pases de invitado y la apertura remota no (el PIN se valida en el servidor). |
+| Corte de luz | Cerradura **bloqueada** (*fail-secure*). El bloqueo total y la caché se conservan. |
+| Arranque sin internet | Sin reloj con batería: hasta tener hora, solo abren las credenciales sin restricción horaria y los administradores. Para evitarlo, añade un DS3231. |
+| Bloqueo total | Solo administradores. **El botón de salida siempre abre.** |
+| Comando con firma mala, vencido o repetido | Se ignora. |
+| El lector falla | La cerradura, el panel y el botón de salida siguen funcionando; el lector se reintenta cada 5 s. |
 
-- **Las tarjetas típicas se pueden clonar:** los llaveros azules y tarjetas blancas (MIFARE Classic) tienen un UID copiable. Para alta seguridad usa DESFire EV2/EV3.
+- **Las tarjetas típicas se pueden clonar.** Los llaveros azules y las tarjetas blancas (MIFARE Classic) tienen un UID copiable. Para alta seguridad, usa DESFire EV2/EV3.
 - **Sin OTA:** el firmware se actualiza por USB.
-- **Registro duplicado posible:** si el servidor responde justo después de los 2,5 s, el intento puede quedar registrado dos veces.

@@ -52,8 +52,9 @@ supabase functions deploy pass-manage unlock device-control enroll-start enroll-
 `APP_ORIGIN` es una lista separada por comas (se usa para CORS). Las funciones con JWT lo verifican en el gateway **y** de nuevo contra `profiles.role`.
 
 ## Límites conocidos (léelos antes de usar en producción)
-- **Falta `device-ingest`** (el endpoint HTTPS del ESP32: latido, tap, ACK, `enroll_read`) y el firmware. Sin el ACK, `pass` devuelve «la cerradura no respondió» y devuelve el uso; abrir/enrolar desde el panel tampoco confirmará. Es lo siguiente a construir.
-- **Las Edge Functions no se ejecutaron**: no hay Deno en este entorno. Verificado: SQL (≈70 pruebas en un Postgres real), criptografía contra Node, y toda la UI en navegador (modo demo). No verificado: `npm:mqtt` sobre WSS en el runtime de Supabase, ni las llamadas reales PostgREST/RPC. Despliega y prueba con una cerradura simulada antes de confiar en ellas.
+- **Estado actual:** `device-ingest` y el firmware existen y están desplegados. El ESP32 confirma cada apertura (ACK) por HTTPS, y las Edge Functions funcionan contra tu Supabase y tu broker EMQX: la apertura desde el panel y los comandos se probaron con la cerradura real.
+- **Sin ACK el invitado no entra:** si el ESP32 no confirma en el plazo, `pass` devuelve «la cerradura no respondió» y le **devuelve el uso**. Es lo esperado cuando la cerradura está desconectada.
+- **Pendiente de probar con el hardware:** el flujo completo de un pase de invitado en la puerta física (enlace + PIN desde un móvil real).
 - El mensaje de WhatsApp por defecto lleva enlace **y** PIN juntos (como pediste); si lo reenvían, quien lo reciba puede entrar. La casilla «PIN en mensaje aparte» lo evita.
 - `wa.me` requiere el número en formato internacional (con código de país).
 - El enlace y el PIN no se pueden recuperar (solo hash): se **regeneran**, lo que invalida el anterior.

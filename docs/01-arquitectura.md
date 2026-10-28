@@ -191,7 +191,7 @@ Archivos: [`supabase/migrations/`](../supabase/migrations/). Puntos de diseño:
 - **Secretos fuera de la Data API:** `guest_pass_secrets` y `rate_limits` tienen RLS activo **sin políticas** y sin `GRANT`: ni siquiera un admin puede leerlas por REST.
 - **Funciones `fn_*` no ejecutables por `anon`/`authenticated`** (se revoca el `EXECUTE` que Postgres da a `PUBLIC`).
 - **Realtime con RLS:** `access_logs`, `device_state`, `enrollment_sessions`, `device_commands`, `guest_passes`, `credentials`. Un `user` solo recibe sus propios eventos.
-- **Presupuesto del plan gratuito:** latido a 60 s ≈ 43 k invocaciones/mes por dispositivo. Con 5 cerraduras ≈ 216 k; la cuota gratuita de Edge Functions es del orden de 500 k/mes (*verifícala*). Los latidos también evitan que Supabase pause el proyecto por inactividad.
+- **Presupuesto del plan gratuito:** con el latido a 15 s, cada cerradura hace ≈ 173 k invocaciones/mes (2 por minuto de uso aparte). Con **una** cerradura cabe sobrado en la cuota gratuita de Edge Functions, que es del orden de 500 k/mes (*verifícala*); con **3 o más** se supera. En ese caso sube `HEARTBEAT_MS` en `config.h` (30 s la reduce a la mitad) y el umbral del cron. Los latidos también evitan que Supabase pause el proyecto por inactividad.
 
 ## 7. NFC desde el celular (Android + iPhone)
 
@@ -236,7 +236,7 @@ Conclusión: **el celular no es la tarjeta; el celular lee un tag de la puerta**
 | Corte eléctrico / red | Definir *fail-secure* (cerrada) o *fail-safe* (abierta) según normativa de salida/incendio; **siempre** botón de salida mecánico/pulsador. |
 | Zona horaria mal configurada | Se valida contra `pg_timezone_names`; el sitio define la zona para todos los horarios. |
 
-**Hardware (recordatorio):** solenoide con fuente propia (12 V) conmutada por MOSFET/relé, **diodo flyback** en paralelo, no alimentar desde el pin del ESP32. PN532 por I²C o SPI.
+**Hardware (recordatorio):** solenoide de 12 V conmutado por un **MOSFET** (IRFZ44N con dos transistores 2N2222A que le dan 12 V a la puerta, o un IRLZ44N solo), **diodo flyback** en paralelo con el solenoide y condensador de 1000 µF; nunca alimentado desde un pin del ESP32. PN532 por **SPI** (por I²C se bloquea con el ESP32) y pantalla TFT ST7735 por un segundo bus SPI. Montaje exacto en [07-conexiones.md](07-conexiones.md).
 
 ## 9. Stack propuesto para las siguientes fases
 

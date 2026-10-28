@@ -110,32 +110,32 @@ Lleva una nota segura (gestor de contraseñas) donde irás pegando estos 10 valo
    - `INGEST_URL` = `https://<ref>.supabase.co/functions/v1/device-ingest`
    - `SUPABASE_KEY` = la publishable.
    - `MQTT_URI` = `mqtts://<MQTT_HOST>:8883`, `MQTT_USER` = `dev-puerta01x`, `MQTT_PASS` = `MQTT_DEVICE_PASSWORD`.
-3. Monta el circuito siguiendo [docs/05](05-firmware.md) §2–§6 **sin conectar todavía el solenoide**. Con el módulo de pared, mide primero con el multímetro que cada salida da lo que dice (3,3 / 5 / 12 V) antes de enchufar el ESP32.
+3. Monta el circuito siguiendo **[docs/07-conexiones.md](07-conexiones.md)** (punto por punto) **sin conectar todavía el solenoide**. Con el módulo de pared, mide primero con el multímetro que cada salida da lo que dice (3,3 / 5 / 12 V) antes de enchufar el ESP32, y haz la revisión del §10 de ese documento.
 4. Carga el firmware (ESP32 por USB):
    ```bash
    cd firmware
-   pio run -t upload --upload-port COM3
+   pio run -t upload --upload-port COM3     # quita antes el cable de VIN; si COM3 está ocupado, cierra el monitor serie
    pio device monitor -p COM3
    ```
-   Debes ver `WiFi conectado`, `MQTT conectado` y `Lista blanca sincronizada`. En el panel la puerta pasa a **En línea** en menos de 1 minuto.
+   Debes ver `PN532 firmware 1.6`, `WiFi conectado`, `MQTT conectado` y `Lista blanca sincronizada`. En el panel la puerta pasa a **En línea** en unos 15 s, y la pantalla muestra la hora y «Acerque su tarjeta».
 
 ## F. Primera prueba con el llavero azul y la tarjeta blanca
 
-1. Panel → **Tarjetas → Registrar nueva** → *Tipo*: **Llavero azul** → **Iniciar registro**. El LED de la cerradura alterna verde/rojo.
+1. Panel → **Tarjetas → Registrar nueva** → *Tipo*: **Llavero azul** → **Iniciar registro**. El LED de la cerradura alterna verde/rojo y la pantalla muestra «Registro» en azul con la cuenta atrás.
 2. Acerca el llavero al PN532 (≈2 cm, plano). En la web aparece el UID; escribe tu nombre → deja activado **Dar acceso a «Puerta principal»** → **Guardar y activar**.
-3. Acerca el llavero de nuevo: bip, LED verde y clic del relé; el feed del panel muestra tu nombre en verde.
-4. Acerca la **tarjeta blanca sin registrar**: LED rojo + 3 bips y **alerta roja "Tarjeta no registrada"** con su UID en el panel.
-5. Botón **Abrir puerta** del panel: el relé abre 3 s. Prueba **Bloqueo total**: el llavero deja de abrir (salvo que seas admin) y el botón de salida sigue abriendo. Quítalo.
+3. Acerca el llavero de nuevo: bip, LED verde, la cerradura abre y la pantalla dice «Bienvenido» con tu nombre; el feed del panel también lo muestra.
+4. Acerca la **tarjeta blanca sin registrar**: LED rojo + 3 bips, la pantalla muestra «Denegado · Tarjeta no registrada» con su UID y aparece la **alerta roja** en el panel.
+5. Botón **Abrir puerta** del panel: la cerradura abre 3 s y el botón central se desactiva mientras tanto. Prueba **Mantener abierta** con un tiempo a medida (por ejemplo 30 s): sale en el registro y la pantalla cuenta atrás. Prueba **Bloqueo total**: el llavero deja de abrir (salvo que seas admin) y el botón de salida sigue abriendo. Quítalo.
 6. **Invitados → Nuevo acceso** → 1 solo uso → **Compartir por WhatsApp** a tu propio número → abre el enlace en el móvil, escribe el PIN: la puerta abre. Ábrelo otra vez: "Sin usos disponibles".
 7. **Prueba offline**: espera 1 minuto (sincroniza la caché), desenchufa el router: el llavero sigue abriendo (destello rojo cada 3 s = sin red). Reconecta: en ≤ 15 s los accesos offline aparecen en el feed.
-8. Solo ahora conecta el solenoide a los 12 V (con su diodo) y repite el paso 3 veinte veces mirando el monitor: el ESP32 no debe reiniciarse.
+8. Repite el paso 3 veinte veces mirando el monitor: el ESP32 no debe reiniciarse. Si el panel muestra **«caída de tensión»** como motivo del último arranque, la fuente no aguanta el solenoide (alimenta el solenoide aparte: [docs/07 §13](07-conexiones.md)).
 
 ## G. Si algo falla
 
 | Síntoma | Causa probable | Solución |
 |---|---|---|
 | Monitor: `device-ingest rechazó las credenciales` | claves o `key_version` distintas | repite E1 con la misma `DEVICE_MASTER_KEY` que está en `supabase/.env` |
-| Monitor: `PN532 no responde` | DIP mal puesto, SDA/SCL invertidos o VCC a 5 V | §2 de docs/05; apaga antes de mover el DIP |
+| Monitor: `PN532 no responde por SPI` | interruptor mal puesto (debe ser 1 OFF / 2 ON), un cable de SCK/MOSI/MISO/SS suelto, o VCC sin 3,3 V | [docs/07 §5](07-conexiones.md); quita la corriente al PN532 después de mover el interruptor |
 | `WiFi perdido` constante | red de 5 GHz o señal débil | usa 2,4 GHz; acerca el router |
 | `MQTT desconectado` en bucle | puerto 8883, usuario o contraseña | revisa B2/B3 y `MQTT_URI` con `mqtts://` |
 | Panel: «Falta la configuración» | variables de GitHub vacías | D4 y vuelve a ejecutar el workflow |
@@ -143,4 +143,7 @@ Lleva una nota segura (gestor de contraseñas) donde irás pegando estos 10 valo
 | Panel: botones dan error de red/CORS | `APP_ORIGIN` no coincide con tu URL | D8 (solo `https://usuario.github.io`, sin ruta) |
 | GitHub Pages da 404 | *Source* no está en *GitHub Actions* | D3 y re-ejecuta el workflow |
 | El invitado ve «La cerradura no respondió» | el ESP32 no confirmó la apertura | monitor serie; revisa MQTT del dispositivo |
-| El ESP32 se reinicia al cerrar la puerta | diodo ausente o al revés | §4 de docs/05 |
+| El ESP32 se reinicia al abrir o cerrar la puerta | diodo del solenoide ausente o al revés, o la fuente no da la corriente | [docs/07 §3 y §13](07-conexiones.md); mira «Encendida … · caída de tensión» en el panel |
+| Monitor: `Relé ACTIVADO pero GPIO 26 lee 0` | algo tira D26 a GND (cortocircuito) | entre D26 y GND debe haber ~11 kΩ: [docs/07 §10](07-conexiones.md) |
+| El log dice `GPIO 26 = 1` pero el solenoide no se mueve | el MOSFET no conduce: falta Q1/Q2 o es un IRFZ44N sin ellos | mide la puerta (12 V) y D–S (< 0,3 V): [docs/07 §11](07-conexiones.md) |
+| La pantalla queda en blanco o con basura | SCL → D14, SDA → D13, CS → D15, DC → D17, RST → D16 mal puestos | [docs/07 §6](07-conexiones.md); colores cambiados: `TFT_TAB` en `config.h` |
