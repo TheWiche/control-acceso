@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Activity, CheckCircle2, KeyRound, Link2, ShieldAlert, Smartphone, XOctagon } from 'lucide-react';
 import type { AccessLog } from '../lib/types';
-import { DENY_REASONS, METHOD_LABELS, fmtTime, fmtUid, isUnknownCard, timeAgo } from '../lib/format';
+import { DENY_REASONS, METHOD_LABELS, fmtDuration, fmtTime, fmtUid, isUnknownCard, timeAgo } from '../lib/format';
 import { Empty, Segmented, useNow } from './ui';
 
 const methodIcon = (m: AccessLog['method']) =>
@@ -39,7 +39,10 @@ export function ActivityFeed({ logs, fresh }: { logs: AccessLog[]; fresh: Set<nu
                   <span className="muted small">
                     {unknown && l.credential_uid ? <><span className="mono">{fmtUid(l.credential_uid)}</span> · </> : null}
                     {denied && !unknown && l.actor_name ? `${l.actor_name} · ` : null}
-                    {METHOD_LABELS[l.method]}{l.device_name ? ` · ${l.device_name}` : ''}
+                    {l.meta?.action === 'hold_open'
+                      ? `Mantener abierta${l.meta.seconds ? ` ${fmtDuration(l.meta.seconds)}` : ''}`
+                      : METHOD_LABELS[l.method]}
+                    {l.device_name ? ` · ${l.device_name}` : ''}
                   </span>
                 </div>
                 <time className="feed-time" dateTime={l.occurred_at} title={fmtTime(l.occurred_at)}>

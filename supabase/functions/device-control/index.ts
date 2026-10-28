@@ -1,7 +1,7 @@
 // JWT de admin. Bloqueo total y "mantener abierta".
 // El estado se guarda en la base (autoritativo): el ESP32 lo recibe en cada latido aunque el MQTT falle.
 // Por eso la base se actualiza ANTES de publicar el comando: un latido nunca devuelve un estado más viejo.
-import { handler, HttpError, requireRole, serviceClient } from '../_shared/common.ts';
+import { clientIp, handler, HttpError, requireRole, serviceClient } from '../_shared/common.ts';
 import { sendCommand, type CmdType } from '../_shared/mqtt.ts';
 
 const ACTIONS = ['lockdown_on', 'lockdown_off', 'hold_open', 'release'] as const;
@@ -30,6 +30,7 @@ Deno.serve(handler(async (req, body) => {
 
   let arg = '';
   let holdUntil: string | null = null;
+  let holdSecs = 0;
   const patch: Record<string, unknown> = {};
   if (action === 'lockdown_on') { patch.lockdown = true; patch.hold_open_until = null; }   // el bloqueo anula "mantener abierta"
   if (action === 'lockdown_off') patch.lockdown = false;
@@ -38,13 +39,22 @@ Deno.serve(handler(async (req, body) => {
     if (dev.lockdown) throw new HttpError(409, 'Quita primero el bloqueo total');
     // Si la cerradura no está conectada, la puerta se abriría sola al volver la conexión: se rechaza.
     if (!st?.is_online) throw new HttpError(409, 'La cerradura está desconectada');
-    const untilEpoch = Math.floor(Date.now() / 1000) + holdSeconds(body);
+    holdSecs = holdSeconds(body);
+    const untilEpoch = Math.floor(Date.now() / 1000) + holdSecs;
     holdUntil = new Date(untilEpoch * 1000).toISOString();
     patch.hold_open_until = holdUntil;
     arg = String(untilEpoch);   // hora absoluta de cierre (epoch, s): la misma que guarda la base
   }
   const { error } = await db.from('devices').update(patch).eq('id', dev.id);
   if (error) throw error;
+  if (action === 'hold_open') {
+    // Aparece en el registro como una apertura más (el fallo del registro no impide abrir).
+    const { error: logErr } = await db.rpc('fn_log_hold_open', {
+      p_device_id: dev.id, p_profile_id: caller.id, p_seconds: holdSecs,
+      p_ip: clientIp(req), p_ua: req.headers.get('user-agent')?.slice(0, 200) ?? null,
+    });
+    if (logErr) console.error(logErr);
+  }
 
   try {
     await sendCommand(db, dev, action as CmdType, { arg, issuedBy: caller.id, ttlSec: 30 });

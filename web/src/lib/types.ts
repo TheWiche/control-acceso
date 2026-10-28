@@ -59,6 +59,7 @@ export interface AccessLog {
   credential_id: string | null;
   credential_uid: string | null;
   guest_pass_id: string | null;
+  meta?: { action?: string; seconds?: number; offline?: boolean } | null;
 }
 
 export interface Credential {

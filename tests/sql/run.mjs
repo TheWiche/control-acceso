@@ -168,6 +168,15 @@ await as('service_role', null, () => q(`select public.fn_device_heartbeat('door0
 check('motivo inválido no sobrescribe', (await resetOf()) === 'brownout');
 await as('service_role', null, () => q(`select public.fn_device_heartbeat('door001')`));
 check('latido sin motivo conserva el último', (await resetOf()) === 'brownout');
+
+// ---- "mantener abierta" en el registro (migración log_hold_open) ----
+const holdLogId = await as('service_role', null, async () =>
+  (await q(`select public.fn_log_hold_open($1, $2, 300) r`, [d1.id, prof['admin@x.com']]))[0].r);
+const holdLog = (await q(`select result, method, actor_name, meta from access_logs where id = $1`, [holdLogId]))[0];
+check('hold_open queda en el registro', holdLog.result === 'granted' && holdLog.method === 'remote_app'
+  && holdLog.meta.action === 'hold_open' && holdLog.meta.seconds === 300 && !!holdLog.actor_name, holdLog);
+check('authenticated no puede escribir en el registro', !!(await fails_with(() =>
+  as('authenticated', prof['admin@x.com'], () => q(`select public.fn_log_hold_open($1, $2, 60)`, [d1.id, prof['admin@x.com']])))));
 await db.exec(`update devices set lockdown=false where id='${d1.id}'`);
 r = await redeem(p4.token, p4.pin); check('sin lockdown, pase abre', r.granted === true, r);
 

@@ -13,8 +13,16 @@ std::atomic<bool>     s_relayOn{false};
 Preferences           s_prefs;
 
 inline void writeRelay(bool on) {
-  digitalWrite(PIN_RELAY, (on ^ RELAY_ACTIVE_LOW) ? HIGH : LOW);
+  int level = (on ^ RELAY_ACTIVE_LOW) ? HIGH : LOW;
+  digitalWrite(PIN_RELAY, level);
   s_relayOn = on;
+  // En el ESP32 un pin OUTPUT mantiene la entrada activa: se lee el nivel real del pad. Si se ordenó HIGH
+  // y se lee 0, algo externo lo tira a GND (cortocircuito, o base del transistor sin la resistencia de 1 kΩ).
+  delayMicroseconds(50);
+  int pad = digitalRead(PIN_RELAY);
+  if (pad != level) log_e("Relé %s pero GPIO %d lee %d: el pin está forzado desde fuera (¿cortocircuito a GND?)",
+                          on ? "ACTIVADO" : "DESACTIVADO", PIN_RELAY, pad);
+  else log_i("Relé %s (GPIO %d = %d)", on ? "ACTIVADO" : "DESACTIVADO", PIN_RELAY, pad);
 }
 }  // namespace
 
