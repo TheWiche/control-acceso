@@ -20,6 +20,6 @@
 
 // Broker MQTT (TLS). Usuario propio del dispositivo; solo necesita suscribirse a acc/v1/<code>/cmd
 // y publicar en acc/v1/<code>/status.
-#define MQTT_URI       "mqtts://<cluster>.s1.eu.hivemq.cloud:8883"
+#define MQTT_URI       "mqtts://<host>.emqxsl.com:8883"
 #define MQTT_USER      "dev-puerta01x"
 #define MQTT_PASS      "contraseña-mqtt"

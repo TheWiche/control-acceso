@@ -9,3 +9,4 @@ supabase/functions/.env
 firmware/include/secrets.h
 .pio/
 dist/
+supabase/.admin-password
