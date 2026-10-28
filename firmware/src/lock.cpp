@@ -60,6 +60,16 @@ void pulse(uint32_t ms) {
 void holdOpenUntil(uint32_t epoch) { s_holdUntil = epoch; }
 uint32_t holdUntil() { return s_holdUntil; }
 
+uint32_t openLeftMs() {
+  if (!s_relayOn) return 0;
+  uint32_t left = 0;
+  uint32_t pulse = s_pulseUntilMs.load();
+  if (pulse) { int32_t d = msDiff(pulse, millis()); if (d > 0) left = (uint32_t)d; }
+  uint32_t hold = s_holdUntil.load();
+  if (hold && !s_lockdown && timeValid() && nowEpoch() < hold) left = max(left, (uint32_t)((hold - nowEpoch()) * 1000UL));
+  return left;
+}
+
 // setLockdown / setDefaultUnlockMs solo se llaman desde la tarea de red: NVS sin concurrencia.
 void setLockdown(bool on) {
   if (s_lockdown.exchange(on) == on) return;

@@ -4,7 +4,7 @@ Código: [`firmware/`](../firmware/). PlatformIO, plataforma `espressif32@7.0.1`
 Librerías fijadas: PN532 1.3.4, BusIO 1.17.4, ArduinoJson 7.2.1, Adafruit GFX 1.12.6 y Adafruit ST7735 1.11.0.
 MQTT (esp-mqtt), HTTPS (esp_http_client), LittleFS, NVS y mbedTLS vienen en el framework.
 
-**Estado:** firmware **1.3.0**, compila con 0 errores (RAM 14,8 %, flash 57,3 %).
+**Estado:** firmware **1.4.0**, compila con 0 errores (RAM 14,8 %, flash 57,4 %).
 
 | Componente | ¿Probado en el hardware real? |
 |---|---|
@@ -144,7 +144,8 @@ Aunque los pines digan SCL y SDA, **no es I2C**. El lector usa el otro bus (VSPI
   - **Verde:** "Bienvenido" + nombre de la persona.
   - **Rojo:** "Denegado" + motivo ("Fuera de horario", "Tarjeta no registrada"…) + UID.
   - **Azul:** modo registro, con cuenta atrás.
-  - **Verde:** apertura desde la app o botón de salida.
+  - **Verde:** «Bienvenido» + nombre del invitado cuando entra con un pase; «Abierto · Desde la app» si lo abre un administrador; «Salida» con el botón.
+  - **Cuenta atrás:** bajo los mensajes de apertura y en la barra de reposo se lee «Cierra en 7 s» (o «4:32», en «mantener abierta»). El mensaje no desaparece mientras la puerta siga abierta.
 
 Si los colores salen cambiados o hay basura en los bordes, cambia `TFT_TAB` a `INITR_GREENTAB` o `INITR_REDTAB`. Para usarla vertical, `TFT_ROTATION 0`. Sin pantalla, `DISPLAY_ENABLED 0`. Todo en [`config.h`](../firmware/include/config.h).
 

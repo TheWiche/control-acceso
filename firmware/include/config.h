@@ -3,7 +3,7 @@
 //  Configuración de hardware y tiempos (los secretos van en secrets.h)
 // ============================================================================
 
-#define FW_VERSION "1.3.0"
+#define FW_VERSION "1.4.0"
 
 // ---------------- Pines (ESP32 DevKit / WROOM-32) ----------------
 // Evitados a propósito: 0, 2, 5, 12 (strapping) y 6-11 (flash). El 15 (strapping) solo como CS de la

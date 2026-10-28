@@ -172,6 +172,18 @@ const hbName = await as('service_role', null, async () => (await q(`select publi
 const d1Name = (await q(`select name from devices where id = $1`, [d1.id]))[0].name;
 check('latido devuelve el nombre de la puerta (pantalla)', hbName.name === d1Name && !!d1Name, hbName);
 
+// ---- ajustes de la puerta (migración device_settings) ----
+check('latido devuelve unlock_ms y display_msg_s', hbName.unlock_ms > 0 && hbName.display_msg_s === 3, hbName);
+check('display_msg_s fuera de 1-10 rechazado', !!(await fails_with(() => q(`update devices set display_msg_s = 11 where id = $1`, [d1.id]))));
+check('unlock_ms fuera de 500-30000 rechazado', !!(await fails_with(() => q(`update devices set unlock_ms = 100 where id = $1`, [d1.id]))));
+check('nombre vacío rechazado', !!(await fails_with(() => q(`update devices set name = '   ' where id = $1`, [d1.id]))));
+await asUser('admin@x.com', () => q(`update devices set display_msg_s = 6, unlock_ms = 5000 where id = $1`, [d1.id]));
+const hbNew = await as('service_role', null, async () => (await q(`select public.fn_device_heartbeat('door001') r`))[0].r);
+check('el latido refleja el cambio hecho por un admin', hbNew.display_msg_s === 6 && hbNew.unlock_ms === 5000, hbNew);
+await asUser('user@x.com', () => q(`update devices set display_msg_s = 9 where id = $1`, [d1.id]));
+check('un usuario normal no puede cambiar los ajustes', (await q(`select display_msg_s from devices where id = $1`, [d1.id]))[0].display_msg_s === 6);
+await db.exec(`update devices set display_msg_s = 3, unlock_ms = 3000 where id = '${d1.id}'`);
+
 // ---- "mantener abierta" en el registro (migración log_hold_open) ----
 const holdLogId = await as('service_role', null, async () =>
   (await q(`select public.fn_log_hold_open($1, $2, 300) r`, [d1.id, prof['admin@x.com']]))[0].r);
@@ -179,7 +191,7 @@ const holdLog = (await q(`select result, method, actor_name, meta from access_lo
 check('hold_open queda en el registro', holdLog.result === 'granted' && holdLog.method === 'remote_app'
   && holdLog.meta.action === 'hold_open' && holdLog.meta.seconds === 300 && !!holdLog.actor_name, holdLog);
 check('authenticated no puede escribir en el registro', !!(await fails_with(() =>
-  as('authenticated', prof['admin@x.com'], () => q(`select public.fn_log_hold_open($1, $2, 60)`, [d1.id, prof['admin@x.com']])))));
+  asUser('admin@x.com', () => q(`select public.fn_log_hold_open($1, $2, 60)`, [d1.id, prof['admin@x.com']])))));
 await db.exec(`update devices set lockdown=false where id='${d1.id}'`);
 r = await redeem(p4.token, p4.pin); check('sin lockdown, pase abre', r.granted === true, r);
 

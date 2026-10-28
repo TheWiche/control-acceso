@@ -24,6 +24,7 @@ std::atomic<bool>     g_online{false};
 std::atomic<bool>     g_mqttUp{false};
 std::atomic<bool>     g_disabled{false};
 std::atomic<uint32_t> g_enrollUntilMs{0};
+std::atomic<uint32_t> g_displayMs{UI_EVENT_MS};
 
 static portMUX_TYPE s_nameMux = portMUX_INITIALIZER_UNLOCKED;
 static char s_deviceName[33] = "";

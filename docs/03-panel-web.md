@@ -37,6 +37,19 @@ El panel y el servidor aplican las mismas reglas; el servidor es el que decide, 
 - **Telemetría:** señal, último latido, IP y versión del firmware, cuánto lleva encendida la cerradura y **el motivo del último reinicio** («caída de tensión» en rojo delata una fuente débil).
 - **«Mantener abierta» y los accesos con tarjeta o pase** aparecen en el registro; el primero con su duración.
 
+## Página «Ajustes»
+Un administrador cambia desde el panel lo que antes exigía tocar el código. Cada cambio se valida en el formulario **y** en la base de datos (restricciones `check` y RLS: un usuario normal no puede escribir).
+
+| Ajuste | Rango | Qué controla |
+|---|---|---|
+| **Tiempo que se mantiene abierta** | 0,5 a 30 s (admite coma decimal) | cuánto abre la cerradura con tarjeta, desde la app, con un pase de invitado y con el botón de salida (`devices.unlock_ms`) |
+| **Mensajes en la pantalla** | 1 a 10 s | cuánto se ve «Bienvenido» o «Denegado» (`devices.display_msg_s`); si la puerta sigue abierta, se ve hasta que cierre |
+| **Nombre** y **ubicación** | nombre no vacío | cómo se llama la puerta en el panel y en la pantalla |
+| **Puerta habilitada** | sí / no | deshabilitada, ninguna tarjeta ni pase abre; el botón de salida sí |
+| **Zona horaria** (del lugar) | lista IANA | horarios de tarjetas e invitados y hora de la pantalla (`sites.timezone`) |
+
+Los cambios llegan a la cerradura con el siguiente latido (≤ 15 s). «Mantener abierta» no se configura aquí: su duración se elige cada vez, de 5 s a 4 h.
+
 ## Estructura
 ```
 web/src/

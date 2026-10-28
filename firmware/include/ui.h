@@ -9,7 +9,8 @@ namespace Ui {
 enum Kind : uint8_t {
   Granted,     // a = nombre de la persona (puede ir vacío) · b = "offline" si decidió la caché local
   Denied,      // a = clave deny_reason (unknown_credential, outside_schedule…) · b = UID en HEX
-  Remote,      // apertura ordenada desde la app o un pase de invitado
+  Remote,      // apertura ordenada por un administrador desde la app
+  Guest,       // apertura con un pase de invitado: a = nombre del invitado
   ExitButton,  // botón de salida
   EnrollWait,  // modo registro: esperando tarjeta
   EnrollSent,  // a = UID leído, enviado al servidor

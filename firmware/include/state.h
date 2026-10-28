@@ -36,6 +36,7 @@ extern std::atomic<bool>     g_online;        // WiFi + HTTPS respondiendo recie
 extern std::atomic<bool>     g_mqttUp;
 extern std::atomic<bool>     g_disabled;      // devices.is_active = false
 extern std::atomic<uint32_t> g_enrollUntilMs; // 0 = sin modo registro
+extern std::atomic<uint32_t> g_displayMs;     // ms que la pantalla muestra cada mensaje (devices.display_msg_s)
 
 void enrollStart(const char* sessionId);
 bool enrollActive();

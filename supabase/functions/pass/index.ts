@@ -51,7 +51,10 @@ Deno.serve(handler(async (req, body) => {
 
     let commandId: string;
     try {
-      ({ commandId } = await sendCommand(db, dev, 'unlock', { arg: dev.unlock_ms, accessLogId: r.log_id, ttlSec: 8 }));
+      // Argumento firmado "<ms>;<nombre>": el ESP32 muestra el nombre del invitado en su pantalla. Un firmware
+      // anterior lee solo el número (strtoul se detiene en ';'). Sin '|' (separador de la firma) ni control.
+      const who = String(r.guest ?? '').replace(/[|;\u0000-\u001f]/g, ' ').trim().slice(0, 24);
+      ({ commandId } = await sendCommand(db, dev, 'unlock', { arg: who ? `${dev.unlock_ms};${who}` : dev.unlock_ms, accessLogId: r.log_id, ttlSec: 8 }));
     } catch (e) {
       console.error('MQTT publish falló', e);
       await db.rpc('fn_refund_pass_use', { p_log_id: r.log_id });

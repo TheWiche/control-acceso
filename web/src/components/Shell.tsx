@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { CreditCard, LayoutDashboard, LogOut, ShieldCheck, Ticket } from 'lucide-react';
+import { CreditCard, LayoutDashboard, LogOut, Settings as SettingsIcon, ShieldCheck, Ticket } from 'lucide-react';
 import { useAuth } from '../context/Auth';
 import { DEMO } from '../lib';
 
@@ -7,6 +7,7 @@ const nav = [
   { to: '/', label: 'Panel', icon: LayoutDashboard, end: true },
   { to: '/tarjetas', label: 'Tarjetas', icon: CreditCard, end: false },
   { to: '/invitados', label: 'Invitados', icon: Ticket, end: false },
+  { to: '/ajustes', label: 'Ajustes', icon: SettingsIcon, end: false },
 ];
 
 export function Shell() {

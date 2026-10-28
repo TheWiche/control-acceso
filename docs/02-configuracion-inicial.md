@@ -104,7 +104,7 @@ supabase secrets set \
 ## 8. Checklist antes de pasar a la Fase 2
 
 - [ ] Proyecto creado, registro público **desactivado**.
-- [ ] Las 9 migraciones aplicadas sin errores (`supabase db push`); 3 jobs en `cron.job` (`acc-mark-offline` cada 15 s, `acc-expire-pending` y `acc-purge-rate-limits`).
+- [ ] Las 10 migraciones aplicadas sin errores (`supabase db push`); 3 jobs en `cron.job` (`acc-mark-offline` cada 15 s, `acc-expire-pending` y `acc-purge-rate-limits`).
 - [ ] Tu usuario es `admin`; sitio con **zona horaria correcta**; un dispositivo de prueba.
 - [ ] Broker creado, credenciales anotadas.
 - [ ] `DEVICE_MASTER_KEY` generada y respaldada.

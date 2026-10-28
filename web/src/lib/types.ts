@@ -37,10 +37,23 @@ export interface Device {
   name: string;
   location: string | null;
   unlock_ms: number;
+  display_msg_s: number;   // segundos que la pantalla del ESP32 muestra cada mensaje (1-10)
   is_active: boolean;
   lockdown: boolean;
   hold_open_until: string | null;
 }
+
+/** Lo que se puede cambiar desde «Ajustes» (las restricciones también las aplica la base de datos). */
+export type DeviceSettings = Pick<Device, 'name' | 'location' | 'unlock_ms' | 'display_msg_s' | 'is_active'>;
+
+export interface Site {
+  id: string;
+  name: string;
+  timezone: string;   // zona IANA, p. ej. America/Bogota: gobierna horarios, pases y la hora de la pantalla
+}
+
+export const UNLOCK_MS_MIN = 500, UNLOCK_MS_MAX = 30_000;
+export const DISPLAY_S_MIN = 1, DISPLAY_S_MAX = 10;
 
 export interface DeviceView extends Device {
   state: DeviceState;

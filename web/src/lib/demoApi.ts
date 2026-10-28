@@ -23,14 +23,16 @@ const people: PersonLite[] = [
 ];
 const nameOf = (id: string | null) => people.find((p) => p.id === id)?.full_name ?? null;
 
+const demoSite = { id: 's1', name: 'Casa', timezone: 'America/Bogota' };
+
 const devices: DeviceView[] = [
   {
-    id: 'd1', device_code: 'puerta01x', name: 'Puerta principal', location: 'Entrada · Planta baja', unlock_ms: 3000,
+    id: 'd1', device_code: 'puerta01x', name: 'Puerta principal', location: 'Entrada · Planta baja', unlock_ms: 3000, display_msg_s: 3,
     is_active: true, lockdown: false, hold_open_until: null,
     state: { device_id: 'd1', is_online: true, last_seen_at: ago(4), ip_address: '192.168.1.42', rssi: -58, lock_state: 'locked', door_closed: true, firmware_version: '0.4.1', uptime_seconds: 188_000, last_reset_reason: 'power_on', enroll_mode_until: null },
   },
   {
-    id: 'd2', device_code: 'bodega02y', name: 'Bodega', location: 'Sótano', unlock_ms: 4000,
+    id: 'd2', device_code: 'bodega02y', name: 'Bodega', location: 'Sótano', unlock_ms: 4000, display_msg_s: 3,
     is_active: true, lockdown: false, hold_open_until: null,
     state: { device_id: 'd2', is_online: false, last_seen_at: ago(1260), ip_address: '192.168.1.57', rssi: -81, lock_state: 'locked', door_closed: true, firmware_version: '0.4.1', uptime_seconds: null, last_reset_reason: null, enroll_mode_until: null },
   },
@@ -240,6 +242,16 @@ export const demoApi: Api = {
     }
     return 'expired';
   },
+  async updateDevice(id, patch) {
+    const d = devices.find((x) => x.id === id);
+    await wait(300);
+    if (!d) throw new Error('Dispositivo desconocido');
+    if (patch.name !== undefined && !patch.name.trim()) throw new Error('El nombre no puede estar vacío');
+    patchDevice(id, patch);
+  },
+  async getSite() { await wait(150); return structuredClone(demoSite); },
+  async updateSite(_id, patch) { await wait(300); Object.assign(demoSite, patch); },
+
   async deviceControl(deviceCode, action, seconds) {
     const d = devices.find((x) => x.device_code === deviceCode);
     await wait(400);

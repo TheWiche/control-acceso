@@ -21,7 +21,7 @@ El navegador solo envía `token + PIN + puerta`. Todo lo demás se decide en el 
 3. **Rate limit** por IP (60/5 min) y por token (12/10 min) antes de tocar la lógica; lo bloqueado no escribe logs (no se puede inundar el registro).
 4. **Vigencia, días, horario, puerta, revocación y usos** se evalúan con la hora del servidor y la zona horaria del sitio. Cambiar el reloj del teléfono no sirve.
 5. **El uso se consume de forma atómica** (`UPDATE … WHERE uses_count < max_uses`): dos taps simultáneos no pasan de `max_uses`.
-6. **La apertura exige un comando MQTT firmado** (HMAC con clave derivada por dispositivo, `exp` 8 s). El navegador nunca ve ni la clave ni el broker.
+6. **La apertura exige un comando MQTT firmado** (su argumento lleva también el nombre del invitado, que la pantalla de la cerradura muestra) (HMAC con clave derivada por dispositivo, `exp` 8 s). El navegador nunca ve ni la clave ni el broker.
 7. **Confirmación física:** la función espera el ACK del ESP32. Si no llega, devuelve el uso (`fn_refund_pass_use`, idempotente, ventana de 2 min). Es seguro porque a los 8 s el ESP32 ya rechazaría ese comando.
 8. **Nada en el cliente es autoridad:** la vista pública solo muestra lo que responde `pass`. Revocar desde el panel surte efecto en el siguiente intento.
 

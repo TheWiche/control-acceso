@@ -20,7 +20,7 @@ Ver la web sin backend: `cd web && npm install && npm run demo`.
 
 ## Pruebas
 ```bash
-cd tests && npm ci && npm test                               # integración (365 checks) + SQL (90 pruebas)
+cd tests && npm ci && npm test                               # integración (375 checks) + SQL (96 pruebas)
 deno check supabase/functions/*/index.ts                     # tipos de las Edge Functions
 deno test --allow-read tests/functions/                      # cripto Edge ↔ firmware ↔ aprovisionamiento
 cd web && npm run build                                      # tsc + build
@@ -31,8 +31,8 @@ Todo esto corre en GitHub Actions en cada push (`ci.yml`, `firmware-ci.yml`).
 ## Estado de verificación
 | Parte | Verificado | Pendiente |
 |---|---|---|
-| SQL (9 migraciones) | 90 pruebas en Postgres (PGlite): reglas, RLS, permisos, caché, pases, latido y registro | — (aplicadas en tu proyecto) |
-| Integración entre capas | 365 comprobaciones automáticas (tablas, columnas, embeds, RPC, MQTT, comandos, env) | — |
+| SQL (10 migraciones) | 96 pruebas en Postgres (PGlite): reglas, RLS, permisos, caché, pases, latido y registro | — (aplicadas en tu proyecto) |
+| Integración entre capas | 375 comprobaciones automáticas (tablas, columnas, embeds, RPC, MQTT, comandos, env) | — |
 | Edge Functions | `deno check` de las 7; desplegadas y usadas desde el panel real; MQTT por WSS contra tu EMQX | — |
 | Web | typecheck + build con base `/<repo>/`; flujos en navegador (Edge, modo demo); publicada en GitHub Pages y usada con tu Supabase | — |
-| Firmware 1.3.0 | compila 0 errores; **probado en el hardware**: PN532 por SPI, tarjetas, cerradura con MOSFET, apertura desde el panel, LEDs | confirmar la pantalla TFT montada |
+| Firmware 1.4.0 | compila 0 errores; **probado en el hardware**: PN532 por SPI, tarjetas, cerradura con MOSFET, apertura desde el panel, LEDs | confirmar la pantalla TFT montada |

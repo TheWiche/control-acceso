@@ -1,7 +1,7 @@
 import type {
   GuestPass, NewPassInput, PassSecret,
   AccessLog, ActivityPoint, CommandStatus, Credential, CredentialKind, CredentialStatus, DeviceAction,
-  DeviceView, EnrollmentSession, Grant, Metrics, PersonLite, Profile, ScheduleRule,
+  DeviceSettings, DeviceView, EnrollmentSession, Grant, Metrics, PersonLite, Profile, ScheduleRule, Site,
 } from './types';
 
 export type Unsub = () => void;
@@ -53,6 +53,9 @@ export interface Api {
   unlock(deviceCode: string): Promise<{ commandId: string }>;
   waitCommand(commandId: string, timeoutMs: number): Promise<CommandStatus>;
   /** `seconds`: duración de hold_open. `delivered` = el broker aceptó el comando (si no, lo aplica el próximo latido). */
+  updateDevice(id: string, patch: Partial<DeviceSettings>): Promise<void>;
+  getSite(): Promise<Site | null>;
+  updateSite(id: string, patch: Partial<Pick<Site, 'name' | 'timezone'>>): Promise<void>;
   deviceControl(deviceCode: string, action: DeviceAction, seconds?: number): Promise<{ delivered: boolean }>;
 
   enrollStart(deviceCode: string, kind: CredentialKind): Promise<EnrollmentSession>;

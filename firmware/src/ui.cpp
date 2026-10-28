@@ -178,6 +178,11 @@ void drawEvent(const UiMsg& m) {
       if (strcmp(m.b, "offline") == 0) l2 = "Modo sin conexión";
       break;
     case Ui::Remote:     title = "Abierto"; l1 = "Desde la app"; break;
+    case Ui::Guest:
+      title = "Bienvenido";
+      l1 = *m.a ? m.a : "Invitado";
+      if (*m.a) l2 = "Invitado";
+      break;
     case Ui::ExitButton: title = "Salida";  l1 = "Puerta abierta"; break;
     case Ui::Denied:
       bg = C_BAD; icon = Icon::Cross; title = "Denegado";
@@ -235,19 +240,26 @@ void drawClock(bool valid, const tm& t) {
   classicCentered(d, center + 16, 1, C_MUTED, C_BG);
 }
 
+/** "Cierra en 7 s" / "Cierra en 4:32" / "Cierra en 1:02:03". */
+void fmtLeft(uint32_t ms, char* out, size_t n) {
+  uint32_t s = (ms + 999) / 1000;
+  if (s >= 3600) snprintf(out, n, "Cierra en %u:%02u:%02u", (unsigned)(s / 3600), (unsigned)(s / 60 % 60), (unsigned)(s % 60));
+  else if (s >= 60) snprintf(out, n, "Cierra en %u:%02u", (unsigned)(s / 60), (unsigned)(s % 60));
+  else snprintf(out, n, "Cierra en %u s", (unsigned)s);
+}
+
+bool opensDoor(Ui::Kind k) { return k == Ui::Granted || k == Ui::Guest || k == Ui::Remote || k == Ui::ExitButton; }
+
 /** Estado de la barra inferior: lo más importante primero. */
 uint16_t barState(char* l1, size_t n1, char* l2, size_t n2) {
   l2[0] = 0;
-  uint32_t hold = Lock::holdUntil(), now = nowEpoch();
-  bool holding = hold && timeValid() && now < hold && !Lock::lockdown();
+  uint32_t left = Lock::openLeftMs();
   if (g_disabled) { strlcpy(l1, "Puerta deshabilitada", n1); return C_BAR; }
   if (Lock::lockdown()) { strlcpy(l1, "BLOQUEO TOTAL", n1); strlcpy(l2, "Solo administradores", n2); return C_BAD; }
-  if (holding) {
-    uint32_t s = hold - now;
+  if (left) {   // abierta con hora de cierre: apertura temporal (verde) o «mantener abierta» (ámbar)
     strlcpy(l1, "Puerta abierta", n1);
-    if (s >= 3600) snprintf(l2, n2, "Cierra en %u:%02u:%02u", (unsigned)(s / 3600), (unsigned)(s / 60 % 60), (unsigned)(s % 60));
-    else snprintf(l2, n2, "Cierra en %u:%02u", (unsigned)(s / 60), (unsigned)(s % 60));
-    return C_WARN;
+    fmtLeft(left, l2, n2);
+    return Lock::holdUntil() ? C_WARN : C_OK;
   }
   if (Lock::isUnlocked()) { strlcpy(l1, "Puerta abierta", n1); return C_OK; }
   if (enrollActive()) { strlcpy(l1, "Modo registro", n1); strlcpy(l2, "Acerque la tarjeta", n2); return C_INFO; }
@@ -314,7 +326,9 @@ void uiTask(void*) {
       idle = false;
       kind = m.kind;
       lastLeft = 0;
-      until = millis() + (m.kind == Ui::EnrollSent ? 6000 : UI_EVENT_MS);
+      until = millis() + (m.kind == Ui::EnrollSent ? 6000 : g_displayMs.load());
+      if (opensDoor(m.kind)) until = max(until, (uint32_t)(millis() + Lock::openLeftMs() + 300));   // se queda hasta que cierre
+      lastLeft = 0xFFFFFFFF;
       continue;
     }
 
@@ -331,6 +345,21 @@ void uiTask(void*) {
           lastLeft = left;
         }
         continue;
+      }
+      if (opensDoor(kind)) {   // «Cierra en 3 s» bajo el mensaje, una vez por segundo
+        uint32_t left = Lock::openLeftMs();
+        uint32_t sec = (left + 999) / 1000;
+        if (sec != lastLeft) {
+          lastLeft = sec;
+          int16_t y = H - 26;
+          uint16_t bg = C_OK;
+          s_tft.fillRect(0, y, W, 10, bg);
+          if (left) {
+            char t[32];
+            fmtLeft(left, t, sizeof t);
+            classicCentered(t, y + 1, 1, C_TEXT, bg);
+          }
+        }
       }
       if (msDiff(until, now) > 0) continue;
       inEvent = false;

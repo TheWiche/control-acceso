@@ -211,7 +211,7 @@ function HoldModal({ holding, onClose, onPick }: { holding: boolean; onClose: ()
       <div className="field">
         <span>Otro tiempo</span>
         <div className="hold-custom">
-          <input type="number" inputMode="decimal" min={0} step="any" value={amount}
+          <input type="text" inputMode="decimal" autoComplete="off" value={amount}
             onChange={(e) => setAmount(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !error) onPick(seconds); }}
             aria-invalid={!!error} aria-label="Duración" />
           <Segmented value={unit} onChange={setUnit}

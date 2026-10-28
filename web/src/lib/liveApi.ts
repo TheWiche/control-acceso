@@ -1,7 +1,7 @@
 import { createClient, type RealtimeChannel } from '@supabase/supabase-js';
 import type { Api, Unsub } from './api';
 import type {
-  AccessLog, CommandStatus, Credential, DeviceView, EnrollmentSession, Grant, GuestPass, PassSecret, PersonLite, Profile,
+  AccessLog, CommandStatus, Credential, DeviceView, EnrollmentSession, Grant, GuestPass, PassSecret, PersonLite, Profile, Site,
 } from './types';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -247,6 +247,22 @@ export const liveApi: Api = {
       }, 1500);
       const to = setTimeout(() => finish('expired'), timeoutMs);
     });
+  },
+
+  async updateDevice(id, patch) {
+    const { error } = await sb.from('devices').update(patch).eq('id', id);
+    fail(error);
+  },
+
+  async getSite() {
+    const { data, error } = await sb.from('sites').select('id, name, timezone').order('created_at').limit(1).maybeSingle();
+    fail(error);
+    return (data as Site | null) ?? null;
+  },
+
+  async updateSite(id, patch) {
+    const { error } = await sb.from('sites').update(patch).eq('id', id);
+    fail(error);
   },
 
   async deviceControl(deviceCode, action, seconds) {

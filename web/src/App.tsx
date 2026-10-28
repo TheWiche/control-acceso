@@ -6,6 +6,7 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Cards } from './pages/Cards';
 import { Guests } from './pages/Guests';
+import { Settings } from './pages/Settings';
 import { GuestKey } from './pages/GuestKey';
 import { CONFIG_MISSING } from './lib';
 
@@ -19,6 +20,7 @@ function Gate() {
         <Route index element={<Dashboard />} />
         <Route path="tarjetas" element={<Cards />} />
         <Route path="invitados" element={<Guests />} />
+        <Route path="ajustes" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

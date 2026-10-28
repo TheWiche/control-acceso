@@ -237,9 +237,11 @@ void handleCommand(const MqttMsg& m) {
   bool ok = true;
   if (cmd == "unlock") {
     uint32_t ms = strtoul(arg, nullptr, 10);
+    const char* who = strchr(arg, ';');   // "<ms>;<nombre del invitado>" (lo manda la función `pass`)
     Lock::pulse(ms ? ms : Lock::defaultUnlockMs());
     Feedback::signal(Feedback::Granted);
-    Ui::event(Ui::Remote);
+    if (who && who[1]) Ui::event(Ui::Guest, who + 1);
+    else Ui::event(Ui::Remote);
   } else if (cmd == "hold_open") {
     // arg = hora absoluta de cierre (epoch, s), la misma que guarda la base. Un número pequeño son
     // minutos (formato del servidor anterior). Nunca más de HOLD_MAX_S desde ahora.
@@ -335,6 +337,7 @@ void heartbeat() {
 
   maybeSetClock(res["server_time"] | 0u);
   g_disabled = !(res["is_active"] | true);
+  g_displayMs = constrain((uint32_t)(res["display_msg_s"] | (UI_EVENT_MS / 1000)), 1UL, 10UL) * 1000UL;
   const char* devName = res["name"] | "";
   if (*devName) setDeviceName(devName);
   Lock::setDefaultUnlockMs(res["unlock_ms"] | DEFAULT_UNLOCK_MS);
