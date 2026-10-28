@@ -1,6 +1,7 @@
 // ============================================================================
 //  Control de Acceso — firmware ESP32
-//    Núcleo 1: tarea del lector (PN532, relé, botón, LEDs) — nunca espera a la red más de 2,5 s
+//    Núcleo 1: tarea de E/S (relé, botón, LEDs, cada 10 ms) y tarea del lector (PN532, decisión
+//              de acceso) — el lector nunca espera a la red más de 2,5 s y no puede frenar el relé
 //    Núcleo 0: tarea de red (WiFi, MQTT, HTTPS, caché)
 // ============================================================================
 #include <Arduino.h>
@@ -19,6 +20,7 @@
 #endif
 
 void readerTask(void*);
+void ioTask(void*);
 
 void setup() {
   Serial.begin(115200);
@@ -39,6 +41,7 @@ void setup() {
   g_netQueue = xQueueCreate(8, sizeof(NetRequest));
   g_accessResp = xQueueCreate(1, sizeof(AccessResponse));
 
+  xTaskCreatePinnedToCore(ioTask, "io", 4096, nullptr, 4, nullptr, 1);
   xTaskCreatePinnedToCore(readerTask, "reader", 6144, nullptr, 3, nullptr, 1);
   xTaskCreatePinnedToCore(netTask, "net", 12288, nullptr, 2, nullptr, 0);
 }

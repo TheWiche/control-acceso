@@ -1,6 +1,9 @@
-// Tarea del lector (núcleo 1): PN532 por I2C con detección por IRQ (no bloqueante),
-// decisión de acceso (servidor -> caché), relé, botón de salida y LEDs.
+// Tarea del lector (núcleo 1): PN532 por I2C con detección por IRQ (no bloqueante) y
+// decisión de acceso (servidor -> caché).
 // Nunca espera a la red más de ACCESS_ONLINE_TIMEOUT_MS: si la red falla, decide con la caché local.
+// Tarea de E/S (núcleo 1, más prioridad): relé, LEDs y botón de salida cada 10 ms. Va aparte porque
+// las llamadas I2C al PN532 pueden bloquear segundos si el lector no responde, y la cerradura
+// tiene que obedecer a los comandos y al botón de salida aunque el lector esté averiado.
 #include <Adafruit_PN532.h>
 #include <Wire.h>
 #include <esp_task_wdt.h>
@@ -63,9 +66,6 @@ void decide(const uint8_t* uid, uint8_t len, const char* hex) {
       AccessResponse resp;
       uint32_t t0 = millis();
       while (msDiff(millis(), t0) < (int32_t)ACCESS_ONLINE_TIMEOUT_MS) {
-        Lock::tick();               // relé, LEDs y botón de salida siguen vivos mientras esperamos
-        Feedback::tick();
-        exitButtonTick();
         esp_task_wdt_reset();
         if (xQueueReceive(g_accessResp, &resp, pdMS_TO_TICKS(40)) == pdTRUE && resp.seq == seq) {
           if (resp.ok) { decided = true; granted = resp.granted; unlockMs = resp.unlockMs; }
@@ -149,9 +149,20 @@ void exitButtonTick() {
 }
 }  // namespace
 
-void readerTask(void*) {
+void ioTask(void*) {
   esp_task_wdt_add(nullptr);
   if (PIN_EXIT_BUTTON >= 0) pinMode(PIN_EXIT_BUTTON, INPUT_PULLUP);
+  for (;;) {
+    esp_task_wdt_reset();
+    Lock::tick();
+    Feedback::tick();
+    exitButtonTick();
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
+void readerTask(void*) {
+  esp_task_wdt_add(nullptr);
   pinMode(PIN_PN532_IRQ, INPUT_PULLUP);
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   Wire.setClock(100000);
@@ -159,9 +170,6 @@ void readerTask(void*) {
 
   for (;;) {
     esp_task_wdt_reset();
-    Lock::tick();
-    Feedback::tick();
-    exitButtonTick();
 
     uint32_t now = millis();
     if (!s_nfcOk) {
