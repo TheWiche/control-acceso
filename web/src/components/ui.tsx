@@ -54,9 +54,16 @@ export function Modal({ title, onClose, children, footer, wide = false, dismissa
   title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean; dismissable?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // onClose suele ser una función nueva en cada render (y hay modales que se redibujan cada 250 ms por su
+  // cuenta atrás). Si el efecto dependiera de ella, se repetiría en cada render y robaría el foco al campo
+  // en el que se está escribiendo. Por eso el foco solo se mueve al abrir y al cerrar.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  const dismissRef = useRef(dismissable);
+  dismissRef.current = dismissable;
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && dismissable) onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && dismissRef.current) closeRef.current(); };
     document.addEventListener('keydown', onKey);
     document.body.classList.add('modal-open');
     ref.current?.focus();
@@ -65,7 +72,7 @@ export function Modal({ title, onClose, children, footer, wide = false, dismissa
       document.body.classList.remove('modal-open');
       prev?.focus?.();
     };
-  }, [onClose, dismissable]);
+  }, []);
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && dismissable) onClose(); }}>
       <div className={`sheet ${wide ? 'sheet-wide' : ''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>

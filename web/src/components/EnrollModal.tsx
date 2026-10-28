@@ -28,6 +28,11 @@ export function EnrollModal({ devices, people, onClose, onSaved }: {
   const [grantDoor, setGrantDoor] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Si el modal se abrió antes de cargar las puertas (o la elegida desapareció), elige la primera en línea.
+  useEffect(() => {
+    if (!devices.some((d) => d.device_code === deviceCode)) setDeviceCode(online[0]?.device_code ?? devices[0]?.device_code ?? '');
+  }, [devices, online, deviceCode]);
+
   const device = devices.find((d) => d.device_code === deviceCode);
   const offRef = useRef<() => void>(() => {});
   const sessionRef = useRef<EnrollmentSession | null>(null);
