@@ -1,10 +1,11 @@
-// Tarea del lector (núcleo 1): PN532 por I2C con detección por IRQ (no bloqueante) y
+// Tarea del lector (núcleo 1): PN532 por SPI (o I2C) con detección por IRQ (no bloqueante) y
 // decisión de acceso (servidor -> caché).
 // Nunca espera a la red más de ACCESS_ONLINE_TIMEOUT_MS: si la red falla, decide con la caché local.
 // Tarea de E/S (núcleo 1, más prioridad): relé, LEDs y botón de salida cada 10 ms. Va aparte porque
-// las llamadas I2C al PN532 pueden bloquear segundos si el lector no responde, y la cerradura
+// las llamadas al PN532 pueden bloquear segundos si el lector no responde, y la cerradura
 // tiene que obedecer a los comandos y al botón de salida aunque el lector esté averiado.
 #include <Adafruit_PN532.h>
+#include <SPI.h>
 #include <Wire.h>
 #include <esp_task_wdt.h>
 #include "cache.h"
@@ -13,7 +14,11 @@
 #include "state.h"
 
 namespace {
+#if NFC_USE_SPI
+Adafruit_PN532 nfc(PIN_SPI_SS, &SPI);
+#else
 Adafruit_PN532 nfc(PIN_PN532_IRQ, PIN_PN532_RST, &Wire);
+#endif
 bool     s_nfcOk = false;
 bool     s_armed = false;
 uint32_t s_lastInitTry = 0, s_lastHealth = 0, s_armedAt = 0;
@@ -35,7 +40,17 @@ bool nfcInit() {
   // Adafruit_PN532::begin() hace el reset por hardware con el pin RST.
   nfc.begin();
   uint32_t v = nfc.getFirmwareVersion();
-  if (!v) { log_e("PN532 no responde (revisa cableado y DIP en modo I2C)"); return false; }
+  if (!v) {
+    // Niveles del bus en reposo: deben ser 1 (pull-up a 3,3 V). Un 0 = línea a GND o PN532 sin alimentación.
+#if NFC_USE_SPI
+    log_e("PN532 no responde por SPI. Revisa DIP (1 OFF, 2 ON), 3,3 V, GND común y SCK=%d MOSI=%d MISO=%d SS=%d",
+          PIN_SPI_SCK, PIN_SPI_MOSI, PIN_SPI_MISO, PIN_SPI_SS);
+#else
+    log_e("PN532 no responde (SDA=%d SCL=%d; ambos deben ser 1). Revisa 3,3 V, GND común, SDA/SCL y DIP en I2C",
+          digitalRead(PIN_I2C_SDA), digitalRead(PIN_I2C_SCL));
+#endif
+    return false;
+  }
   log_i("PN532 firmware %u.%u", (unsigned)((v >> 16) & 0xFF), (unsigned)((v >> 8) & 0xFF));
   nfc.SAMConfig();
   nfc.setPassiveActivationRetries(0xFF);   // espera indefinida: avisa por IRQ cuando hay tarjeta
@@ -45,6 +60,7 @@ bool nfcInit() {
 
 /** Libera un bus I2C colgado (el PN532 sujetando SDA tras un pico): 9 pulsos de reloj + STOP. */
 void i2cBusRecover() {
+#if !NFC_USE_SPI
   Wire.end();
   pinMode(PIN_I2C_SDA, INPUT_PULLUP);
   pinMode(PIN_I2C_SCL, OUTPUT_OPEN_DRAIN);
@@ -59,6 +75,7 @@ void i2cBusRecover() {
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   Wire.setClock(100000);
   Wire.setTimeOut(50);
+#endif
 }
 
 void arm() {
@@ -183,9 +200,14 @@ void ioTask(void*) {
 void readerTask(void*) {
   esp_task_wdt_add(nullptr);
   pinMode(PIN_PN532_IRQ, INPUT_PULLUP);
+#if NFC_USE_SPI
+  // Pines propios: el begin() de la librería ya no los cambia (SPI.begin() solo actúa la primera vez).
+  SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI, -1);
+#else
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   Wire.setClock(100000);
   Wire.setTimeOut(50);
+#endif
 
   for (;;) {
     esp_task_wdt_reset();
@@ -203,7 +225,7 @@ void readerTask(void*) {
         s_lastInitTry = now;
         s_nfcOk = nfcInit();
         if (s_nfcOk) s_nfcFailures = 0;
-        else if (++s_nfcFailures % NFC_MAX_REINIT == 0) { log_w("PN532 sin respuesta: liberando el bus I2C"); i2cBusRecover(); }
+        else if (++s_nfcFailures % NFC_MAX_REINIT == 0 && !NFC_USE_SPI) { log_w("PN532 sin respuesta: liberando el bus I2C"); i2cBusRecover(); }
       }
       vTaskDelay(pdMS_TO_TICKS(20));
       continue;

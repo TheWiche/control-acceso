@@ -23,42 +23,43 @@ Compila con 0 errores (RAM 14,7 %, flash 55,9 %). **Aún no se ha probado con el
 
 ---
 
-## 2. ESP32 ↔ PN532 (I2C)
+## 2. ESP32 ↔ PN532 (SPI)
 
-### 2.1 Interruptores SEL0 / SEL1
-El PN532 tiene un interruptor DIP de 2 palancas, rotulado **ON** y **1 2**. Las palancas se leen **al encender**: cámbialas siempre con la placa desconectada.
+> **Por qué SPI y no I2C.** Por I2C el PN532 retiene la línea SCL mientras procesa (*clock stretching*) y el
+> controlador I2C del ESP32 se queda en timeout (`i2cRead returned Error 263`, SCL medido en 0), sobre todo con el
+> ruido del solenoide. Por SPI no existe ese problema. El firmware sigue admitiendo I2C con `NFC_USE_SPI 0` en
+> [`config.h`](../firmware/include/config.h).
 
-| Modo | Palanca 1 (SEL0) | Palanca 2 (SEL1) |
+### 2.1 Interruptor de modo
+El PN532 tiene un interruptor de 2 palancas, rotulado **ON** y **1 2**, y al lado una tabla impresa (HSU / I2C / SPI).
+Las palancas se leen **al encender**: cámbialas siempre con la placa desconectada.
+
+| Modo | Palanca 1 | Palanca 2 |
 |---|---|---|
 | HSU / UART | OFF | OFF |
-| **I2C ← este proyecto** | **ON** (hacia la palabra «ON») | **OFF** (hacia el lado contrario) |
-| SPI | OFF | ON |
+| I2C | ON | OFF |
+| **SPI ← este proyecto** | **OFF** (lejos de «ON») | **ON** (hacia «ON») |
 
-```
-   Vista superior del DIP en modo I2C
-   ┌───────────────┐
-   │  ON           │   ▲ palanca 1 arriba (hacia ON)  = SEL0 = 1
-   │ [▲]  [ ]      │
-   │ [ ]  [▼]      │   ▼ palanca 2 abajo              = SEL1 = 0
-   │  1    2       │
-   └───────────────┘
-```
-Si tu placa no dice «ON» sino «H/L»: SEL0 = H, SEL1 = L.
+### 2.2 Cableado (placa roja «PN532 NFC RFID V3»)
+Las señales SPI están en el **conector de 8 pines** del lateral (SCK, MISO, MOSI, SS, VCC, GND, IRQ, RSTO).
+VCC y GND pueden seguir en el conector de 4 pines: son los mismos.
 
-### 2.2 Cableado
-
-| PN532 (conector I2C de 4 pines y laterales) | ESP32 | Nota |
+| PN532 | ESP32 | Nota |
 |---|---|---|
-| **VCC** | **3V3** | **3,3 V, NO 5 V**: las pull-up I2C del módulo van a VCC y los GPIO del ESP32 no toleran 5 V |
-| **GND** | **GND** | |
-| **SDA** | **GPIO 21** | cable < 50 cm |
-| **SCL** | **GPIO 22** | trenzado con GND si es largo |
-| **IRQ** | **GPIO 4** | imprescindible: el firmware detecta tarjetas por interrupción, sin bloquear |
-| RSTO / RSTPDN | GPIO 33 (opcional) | Conéctalo solo si tu placa expone **RSTPDN** (p. ej. Adafruit). En la Elechouse V3 el pin **RSTO no se conecta**. Sin él, el firmware se recupera reiniciando el ESP32 si el lector se cuelga |
+| **VCC** | **+3,3 V** del módulo de pared | **3,3 V, nunca 5 V** |
+| **GND** | **GND** común | |
+| **SCK** | **GPIO 22** | el cable que iba a SCL |
+| **MOSI** | **GPIO 21** | el cable que iba a SDA |
+| **MISO** | **GPIO 32** | cable nuevo |
+| **SS** | **GPIO 33** | cable nuevo |
+| **IRQ** | **GPIO 4** | el firmware detecta tarjetas por interrupción, sin bloquear |
+| RSTO | sin conectar | es una salida de reset, no se usa |
+| SCL / SDA (conector de 4 pines) | **sin conectar** | solo se usan en modo I2C |
 
 Junto a los pines VCC/GND del PN532: **100 nF + 10 µF** en paralelo (VCC a GND).
+Lleva los cables del lector **cortos (< 20 cm) y lejos** de los del relé y el solenoide.
 
-> Elegimos I2C porque usa 2 hilos de datos y deja libres los pines del relé y los LEDs. El firmware entregado **solo** implementa I2C.
+Log esperado al arrancar: `PN532 firmware 1.6`. Si sale `PN532 no responde por SPI`, revisa el interruptor y los 4 cables de señal.
 
 ---
 
@@ -183,10 +184,10 @@ Pines evitados a propósito: 0, 2, 5, 12, 15 (arranque) y 6–11 (flash interna)
 ### Resumen pin a pin del ESP32
 | GPIO | Función | | GPIO | Función |
 |---|---|---|---|---|
-| 21 | PN532 SDA | | 26 | 1 kΩ → base NPN del relé (10 kΩ base → GND); HIGH = abre |
-| 22 | PN532 SCL | | 27 | Pulsador de salida |
+| 21 | PN532 MOSI | | 26 | 1 kΩ → base NPN del relé (10 kΩ base → GND); HIGH = abre |
+| 22 | PN532 SCK | | 27 | Pulsador de salida |
 | 4 | PN532 IRQ | | 25 | Reed switch |
-| 33 | PN532 RSTPDN (opcional) | | 18 / 19 | LED verde / rojo |
+| 32 / 33 | PN532 MISO / SS | | 18 / 19 | LED verde / rojo |
 | — | PN532 VCC ← 3,3 V del módulo | | 23 | Zumbador (vía transistor) |
 | VIN | 5 V del módulo de pared (el mismo que la bobina del relé) | | GND | punto único de masa |
 

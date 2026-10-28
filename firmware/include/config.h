@@ -3,14 +3,23 @@
 //  Configuración de hardware y tiempos (los secretos van en secrets.h)
 // ============================================================================
 
-#define FW_VERSION "1.1.1"
+#define FW_VERSION "1.2.0"
 
 // ---------------- Pines (ESP32 DevKit / WROOM-32) ----------------
 // Evitados a propósito: 0, 2, 5, 12, 15 (strapping) y 6-11 (flash).
+// Lector PN532. SPI es lo recomendado con el ESP32: por I2C el PN532 retiene SCL (clock stretching)
+// y el controlador del ESP32 se queda en timeout (Error 263), sobre todo con el ruido del solenoide.
+#define NFC_USE_SPI       1   // 1 = SPI (DIP: 1 OFF, 2 ON) · 0 = I2C (DIP: 1 ON, 2 OFF)
+#define PIN_PN532_IRQ     4   // salida IRQ del PN532 (activa en LOW), igual en SPI e I2C
+// SPI (reaprovecha los cables de GPIO 21/22 del montaje I2C)
+#define PIN_SPI_SCK      22   // PN532 SCK
+#define PIN_SPI_MOSI     21   // PN532 MOSI
+#define PIN_SPI_MISO     32   // PN532 MISO
+#define PIN_SPI_SS       33   // PN532 SS (selección de chip)
+// I2C (solo con NFC_USE_SPI 0)
 #define PIN_I2C_SDA      21
 #define PIN_I2C_SCL      22
-#define PIN_PN532_IRQ     4   // salida IRQ del PN532 (activa en LOW)
-#define PIN_PN532_RST    33   // RSTPDN del PN532 (reset por hardware si se cuelga)
+#define PIN_PN532_RST    -1   // RSTPDN del PN532: la placa roja/Elechouse no lo expone (RSTO es otra cosa)
 
 #define PIN_RELAY        26   // base del NPN que maneja la bobina del relé (1 kΩ en serie, 10 kΩ a GND)
 #define RELAY_ACTIVE_LOW  0   // relé suelto con transistor NPN: HIGH = bobina activada. Módulo con optoacoplador: 1
