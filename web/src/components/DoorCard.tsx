@@ -95,7 +95,7 @@ export function DoorCard({ device, onChanged }: { device: DeviceView; onChanged:
   const holdBlockedWhy = device.lockdown ? 'Quita primero el bloqueo total' : !online ? 'La cerradura está desconectada' : undefined;
 
   return (
-    <article className={`card door ${device.lockdown ? 'is-lockdown' : ''}`} aria-label={device.name}>
+    <article className={`card door stage-${stage} ${device.lockdown ? 'is-lockdown' : ''}`} aria-label={device.name}>
       <header className="door-head">
         <div>
           <h3>{device.name}</h3>

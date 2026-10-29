@@ -6,7 +6,7 @@ const tiles = [
   { key: 'grantedToday', label: 'Accesos hoy', icon: CheckCircle2, tone: 'ok' },
   { key: 'deniedToday', label: 'Denegados', icon: ShieldAlert, tone: 'bad' },
   { key: 'activePeople', label: 'Personas', icon: Users, tone: 'info' },
-  { key: 'activePasses', label: 'Pases activos', icon: Link2, tone: 'info' },
+  { key: 'activePasses', label: 'Pases activos', icon: Link2, tone: 'accent' },
 ] as const;
 
 export function MetricsRow({ metrics }: { metrics: M | null }) {

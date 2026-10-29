@@ -53,12 +53,17 @@ Los cambios llegan a la cerradura con el siguiente latido (≤ 15 s). «Mantener
 ## Estructura
 ```
 web/src/
-  lib/        types.ts · api.ts (contrato) · liveApi.ts (Supabase) · demoApi.ts · format.ts
+  lib/        types.ts · api.ts (contrato) · liveApi.ts (Supabase) · demoApi.ts · format.ts · theme.ts
   context/    Auth.tsx          (sesión + exige rol admin)
-  components/ DoorCard · ActivityFeed · Metrics · EnrollModal · CardEditor · Shell · ui
+  components/ DoorCard · ActivityFeed · Metrics · EnrollModal · CardEditor · Shell · ThemeToggle · ui
   pages/      Login · Dashboard · Cards
 ```
 La UI solo conoce la interfaz `Api`; `liveApi` y `demoApi` la implementan.
+
+## Tema claro y oscuro
+- El selector (luna/sol) está junto a la marca en el panel, en la barra superior móvil, en el inicio de sesión y en la llave del invitado. La elección se guarda en `localStorage` (`ca-theme`); si nunca se eligió, se sigue al sistema operativo.
+- Un script en `web/index.html` fija `data-theme` en `<html>` antes del primer pintado (sin destello) y `lib/theme.ts` lo mantiene sincronizado con el `theme-color` del navegador.
+- Todos los colores son variables CSS en `styles.css`: `:root` es el modo claro y `:root[data-theme='dark']` el oscuro. Cada tono tiene tinta (`--ok`), relleno pastel (`--ok-fill`), marca (`--ok-strong`) y tinte al ~15 % (`--ok-soft`). Para cambiar la paleta basta tocar esos dos bloques.
 
 ## Qué funciona sin Edge Functions y qué no
 

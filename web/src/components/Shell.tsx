@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { CreditCard, LayoutDashboard, LogOut, Settings as SettingsIcon, ShieldCheck, Ticket } from 'lucide-react';
 import { useAuth } from '../context/Auth';
 import { DEMO } from '../lib';
+import { ThemeToggle } from './ThemeToggle';
 
 const nav = [
   { to: '/', label: 'Panel', icon: LayoutDashboard, end: true },
@@ -17,7 +18,10 @@ export function Shell() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark"><ShieldCheck size={17} aria-hidden /></span><span>Control de Acceso</span></div>
+        <div className="side-head">
+          <div className="brand"><span className="brand-mark"><ShieldCheck size={17} aria-hidden /></span><span>Control de Acceso</span></div>
+          <ThemeToggle />
+        </div>
         <nav aria-label="Principal">
           {nav.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
@@ -39,7 +43,10 @@ export function Shell() {
         {DEMO && <div className="demo-banner">MODO DEMO · datos simulados</div>}
         <header className="topbar-mobile">
           <div className="brand"><span className="brand-mark"><ShieldCheck size={17} aria-hidden /></span><span>Control de Acceso</span></div>
-          <button className="icon-btn" aria-label="Cerrar sesión" onClick={() => void signOut()}><LogOut size={20} /></button>
+          <div className="topbar-tools">
+            <ThemeToggle />
+            <button className="icon-btn" aria-label="Cerrar sesión" onClick={() => void signOut()}><LogOut size={20} /></button>
+          </div>
         </header>
         <main><Outlet /></main>
       </div>

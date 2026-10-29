@@ -8,6 +8,7 @@ import { previewPass, redeemPass, type PassPreview } from '../lib/guestApi';
 import { daysText } from '../lib/share';
 import { fmtDateTime } from '../lib/format';
 import { Spinner } from '../components/ui';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 type View =
   | { k: 'loading' }
@@ -145,6 +146,7 @@ export function GuestKey() {
 
   return (
     <div className="guest">
+      <div className="guest-tools"><ThemeToggle /></div>
       <main className="guest-card" aria-live="polite">
         <header className="gp-head">
           <div className="gp-brand"><KeyRound size={15} aria-hidden /><span>Llave digital</span></div>

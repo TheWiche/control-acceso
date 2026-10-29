@@ -3,6 +3,7 @@ import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/Auth';
 import { DEMO } from '../lib';
 import { Spinner } from '../components/ui';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export function Login() {
   const { signIn } = useAuth();
@@ -24,6 +25,7 @@ export function Login() {
 
   return (
     <div className="login">
+      <div className="login-tools"><ThemeToggle /></div>
       <form className="login-card" onSubmit={submit}>
         <div className="login-mark"><ShieldCheck size={30} aria-hidden /></div>
         <h1>Control de Acceso</h1>
