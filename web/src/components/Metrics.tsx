@@ -1,20 +1,19 @@
 import { useMemo } from 'react';
-import { CheckCircle2, Link2, ShieldAlert, Users } from 'lucide-react';
 import type { ActivityPoint, Metrics as M } from '../lib/types';
 
 const tiles = [
-  { key: 'grantedToday', label: 'Accesos hoy', icon: CheckCircle2, tone: 'ok' },
-  { key: 'deniedToday', label: 'Denegados', icon: ShieldAlert, tone: 'bad' },
-  { key: 'activePeople', label: 'Personas', icon: Users, tone: 'info' },
-  { key: 'activePasses', label: 'Pases activos', icon: Link2, tone: 'accent' },
+  { key: 'grantedToday', label: 'Accesos hoy' },
+  { key: 'deniedToday', label: 'Denegados' },
+  { key: 'activePeople', label: 'Personas' },
+  { key: 'activePasses', label: 'Pases activos' },
 ] as const;
 
 export function MetricsRow({ metrics }: { metrics: M | null }) {
   return (
     <div className="metrics">
-      {tiles.map(({ key, label, icon: Icon, tone }) => (
-        <div key={key} className={`card metric tone-${tone}`}>
-          <div className="metric-label"><Icon size={14} aria-hidden />{label}</div>
+      {tiles.map(({ key, label }) => (
+        <div key={key} className="card metric">
+          <div className="metric-label">{label}</div>
           <div className="metric-value">{metrics ? metrics[key] : <span className="skeleton" />}</div>
         </div>
       ))}
@@ -48,6 +47,12 @@ export function ActivityChart({ points }: { points: ActivityPoint[] }) {
         <h3>Últimas 24 horas</h3>
         <div className="legend small muted"><i className="dot dot-ok" /> Concedidos <i className="dot dot-bad" /> Denegados</div>
       </header>
+      <div className="chart-body">
+      <div className="chart-ticks" aria-hidden>
+        {[max, ...(max % 2 === 0 ? [max / 2] : []), 0].map((v) => (
+          <span key={v} style={{ top: `${((1 - v / max) * H) / (H + 18) * 100}%` }}>{v}</span>
+        ))}
+      </div>
       <svg viewBox={`0 0 ${W} ${H + 18}`} role="img" aria-label={`${total} eventos en 24 horas`} preserveAspectRatio="none" className="chart-svg">
         {[0.25, 0.5, 0.75].map((f) => <line key={f} x1="0" x2={W} y1={H * f} y2={H * f} className="grid" />)}
         {buckets.map((b, i) => {
@@ -62,6 +67,7 @@ export function ActivityChart({ points }: { points: ActivityPoint[] }) {
           );
         })}
       </svg>
+      </div>
     </section>
   );
 }

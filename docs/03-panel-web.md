@@ -63,7 +63,7 @@ La UI solo conoce la interfaz `Api`; `liveApi` y `demoApi` la implementan.
 ## Tema claro y oscuro
 - El selector (luna/sol) está junto a la marca en el panel, en la barra superior móvil, en el inicio de sesión y en la llave del invitado. La elección se guarda en `localStorage` (`ca-theme`); si nunca se eligió, se sigue al sistema operativo.
 - Un script en `web/index.html` fija `data-theme` en `<html>` antes del primer pintado (sin destello) y `lib/theme.ts` lo mantiene sincronizado con el `theme-color` del navegador.
-- Todos los colores son variables CSS en `styles.css`: `:root` es el modo claro y `:root[data-theme='dark']` el oscuro. Cada tono tiene tinta (`--ok`), relleno pastel (`--ok-fill`), marca (`--ok-strong`) y tinte al ~15 % (`--ok-soft`). Para cambiar la paleta basta tocar esos dos bloques.
+- Todos los colores son variables CSS en `styles.css`: `:root` es el modo claro y `:root[data-theme='dark']` el oscuro. Cada tono tiene tinta (`--ok`), relleno pastel (`--ok-fill`), marca (`--ok-strong`) y tinte al ~15 % (`--ok-soft`). Para cambiar la paleta basta tocar esos dos bloques. La marca es la menta (el verde de «abierto») y se usa a plena intensidad solo en marcas pequeñas; las áreas llevan sus tintes pálidos. El movimiento sale de la escala de tokens de transitions.dev (`--duration-*`, `--ease-*`, `--distance-*`, `--scale-*`, `--blur-*`), declarada al principio de `styles.css`.
 
 ## Qué funciona sin Edge Functions y qué no
 

@@ -6,7 +6,7 @@
 .chips.tight { margin: 4px 0 0; }
 .cards-list.passes { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
 @media (max-width: 520px) { .cards-list.passes { grid-template-columns: 1fr; } }
-.pass { padding: 16px 18px; display: grid; gap: 12px; transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease), border-color 0.2s, opacity 0.2s; }
+.pass { padding: 16px 18px; display: grid; gap: 12px; transition: transform var(--duration-fast) var(--ease-smooth-out), box-shadow var(--duration-fast) var(--ease-smooth-out), border-color var(--duration-fast), opacity var(--duration-fast); }
 .pass.st-expired, .pass.st-exhausted, .pass.st-revoked { opacity: 0.7; }
 .pass-top { display: flex; align-items: flex-start; gap: 12px; }
 .uses { display: grid; justify-items: end; line-height: 1.1; font-variant-numeric: tabular-nums; }
@@ -38,12 +38,12 @@ a.btn { text-decoration: none; color: inherit; }
 .nfc-url { display: grid; gap: 2px; flex: 1; min-width: 0; }
 
 /* ---------- Vista pública: pase de acceso (estilo cartera digital) ---------- */
-.guest { --notch: 11px; position: relative; min-height: 100dvh; display: grid; place-items: center; padding: calc(18px + var(--sat)) 14px calc(18px + var(--sab)); background: radial-gradient(80% 45% at 50% 0%, var(--accent-soft), transparent 70%), var(--bg); }
+.guest { --notch: 11px; position: relative; min-height: 100dvh; display: grid; place-items: center; padding: calc(18px + var(--sat)) 14px calc(18px + var(--sab)); background: var(--bg); }
 .guest-tools { position: fixed; top: calc(12px + var(--sat)); right: 12px; z-index: 5; }
 .guest-card {
   position: relative; width: 100%; max-width: 384px; display: grid; gap: 14px; padding: 20px 24px 22px; border-radius: 30px;
-  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-lg);
-  animation: pop 0.5s var(--ease);
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm);
+  animation: pop var(--duration-very-slow) var(--ease-smooth-out);
 }
 .gp-head { display: flex; align-items: center; justify-content: space-between; }
 .gp-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.86rem; color: var(--muted); }
@@ -54,7 +54,7 @@ a.btn { text-decoration: none; color: inherit; }
 .gp-state.off i { background: var(--bad-strong); box-shadow: 0 0 8px var(--bad-strong); }
 .gp-cap { font-size: 0.74rem; font-weight: 600; color: var(--muted); }
 .gp-who { display: grid; gap: 2px; }
-.gp-who h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; overflow-wrap: anywhere; }
+.gp-who h1 { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; overflow-wrap: anywhere; }
 
 .gp-fields { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
 .gp-fields > div { min-width: 0; }
@@ -78,13 +78,13 @@ a.btn { text-decoration: none; color: inherit; }
 .guest-center h2 { font-size: 1.45rem; }
 .guest-center .muted { max-width: 300px; }
 .guest-icon { width: 68px; height: 68px; border-radius: 22px; display: grid; place-items: center; }
-.guest-icon.bad { background: var(--bad-soft); color: var(--bad); border: 1px solid color-mix(in srgb, var(--bad-strong) 38%, transparent); animation: pop-in 0.38s var(--spring); }
+.guest-icon.bad { background: var(--bad-soft); color: var(--bad); border: 1px solid color-mix(in srgb, var(--bad-strong) 38%, transparent); animation: pop-in 0.38s var(--ease-bounce); }
 .guest-denied-tag { font-size: 0.78rem; font-weight: 700; color: var(--bad); }
 .guest-note { display: inline-flex; align-items: center; gap: 6px; color: var(--warn); font-weight: 600; font-size: 0.9rem; }
 .guest-doors { display: grid; gap: 6px; justify-items: center; text-align: center; }
 
 .pin-dots { display: flex; justify-content: center; gap: 14px; padding: 4px 0 0; min-height: 22px; }
-.pin-dots i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line-2); transition: background-color 0.15s, border-color 0.15s, transform 0.25s var(--spring); }
+.pin-dots i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line-2); transition: background-color 0.15s, border-color 0.15s, transform 0.25s var(--ease-bounce); }
 .pin-dots i.on { background: var(--accent-strong); border-color: var(--accent-strong); transform: scale(1.12); }
 .pin-dots.shake { animation: shake 0.4s; }
 .pin-hint { min-height: 1.5em; text-align: center; color: var(--muted); font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 8px; }
@@ -92,17 +92,17 @@ a.btn { text-decoration: none; color: inherit; }
 
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .key {
-  height: 68px; border-radius: 22px; border: 0; background: var(--surface-2); box-shadow: var(--shadow-xs);
+  height: 68px; border-radius: 22px; border: 0; background: var(--surface-2);
   font-family: var(--font); font-variant-numeric: tabular-nums; font-size: 1.7rem; font-weight: 600; display: grid; place-items: center; touch-action: manipulation;
-  transition: transform 0.2s var(--spring), background-color 0.15s; user-select: none; -webkit-user-select: none;
+  transition: transform 0.2s var(--ease-bounce), background-color 0.15s; user-select: none; -webkit-user-select: none;
 }
 .key:active:not(:disabled) { transform: scale(0.93); background: var(--accent-soft); }
 .key:disabled { opacity: 0.45; }
-.key-icon { background: transparent; box-shadow: none; color: var(--muted); }
+.key-icon { background: transparent; color: var(--muted); }
 @media (max-height: 740px) { .key { height: 58px; } .keypad { gap: 8px; } .guest-card { gap: 10px; } .gp-who h1 { font-size: 1.7rem; } }
 
 .guest-key-open { position: relative; width: 112px; height: 112px; display: grid; place-items: center; color: var(--ok-strong); margin: 6px 0; }
-.guest-key-open div { position: relative; z-index: 2; width: 88px; height: 88px; border-radius: 50%; display: grid; place-items: center; background: var(--ok-soft); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok-strong) 60%, transparent); animation: pop-in 0.38s var(--spring); }
+.guest-key-open div { position: relative; z-index: 2; width: 88px; height: 88px; border-radius: 50%; display: grid; place-items: center; background: var(--ok-soft); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok-strong) 60%, transparent); animation: pop-in 0.38s var(--ease-bounce); }
 .guest-key-open span { position: absolute; inset: 0; border-radius: 50%; border: 2px solid currentColor; opacity: 0; animation: burst 1.2s ease-out infinite; }
 .guest-key-open span:nth-child(2) { animation-delay: 0.4s; }
 .guest-key-open.done { color: var(--muted); }

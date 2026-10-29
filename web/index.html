@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f6f7fb" />
+    <meta name="theme-color" content="#f5f8f7" />
     <meta name="color-scheme" content="light dark" />
     <meta name="robots" content="noindex,nofollow" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -19,7 +19,7 @@
         try { t = localStorage.getItem('ca-theme'); } catch (e) {}
         if (t !== 'light' && t !== 'dark') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         document.documentElement.dataset.theme = t;
-        document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#0d111c' : '#f6f7fb');
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#0e1315' : '#f5f8f7');
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />

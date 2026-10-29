@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronsRight, Info, LockOpen, X, XCircle } from 'lucide-react';
 
 /** Reloj reactivo para contadores ("hace 12 s", cuenta regresiva). */
@@ -143,8 +143,30 @@ export const Spinner = () => <span className="spinner" aria-label="Cargando" />;
 export function Segmented<T extends string>({ value, onChange, options }: {
   value: T; onChange: (v: T) => void; options: { value: T; label: string }[];
 }) {
+  const bar = useRef<HTMLDivElement>(null);
+  const pill = useRef<HTMLSpanElement>(null);
+  const placed = useRef(false);
+  // La píldora se coloca midiendo el botón activo; la primera vez y al redimensionar va sin transición para no "volar" desde 0.
+  const layoutKey = options.map((o) => o.label).join('|');
+  useLayoutEffect(() => {
+    const place = () => {
+      const el = bar.current?.querySelector<HTMLElement>('button.on');
+      const p = pill.current;
+      if (!el || !p) return;
+      if (!placed.current) p.style.transition = 'none';
+      p.style.transform = `translateX(${el.offsetLeft}px)`;
+      p.style.width = `${el.offsetWidth}px`;
+      if (!placed.current) { void p.offsetWidth; p.style.transition = ''; placed.current = true; }
+    };
+    place();
+    const ro = new ResizeObserver(() => { placed.current = false; place(); });
+    if (bar.current) ro.observe(bar.current);
+    return () => ro.disconnect();
+  }, [value, layoutKey]);
+
   return (
-    <div className="segmented" role="radiogroup">
+    <div className="segmented" role="radiogroup" ref={bar}>
+      <span className="seg-pill" ref={pill} aria-hidden />
       {options.map((o) => (
         <button key={o.value} type="button" role="radio" aria-checked={value === o.value}
           className={value === o.value ? 'on' : ''} onClick={() => onChange(o.value)}>{o.label}</button>

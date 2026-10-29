@@ -4,7 +4,7 @@ export type Theme = 'light' | 'dark';
 
 const KEY = 'ca-theme';
 const EVENT = 'ca-theme-change';
-const META_COLOR: Record<Theme, string> = { light: '#f6f7fb', dark: '#0d111c' };
+const META_COLOR: Record<Theme, string> = { light: '#f5f8f7', dark: '#0e1315' };
 
 function stored(): Theme | null {
   try {

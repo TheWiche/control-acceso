@@ -12,10 +12,10 @@ function png(size, { radius }) {
   const inRR = (x, y, x0, y0, w, h, r) => { const cx = Math.min(Math.max(x, x0 + r), x0 + w - r), cy = Math.min(Math.max(y, y0 + r), y0 + h - r); return (x - cx) ** 2 + (y - cy) ** 2 <= r * r && x >= x0 && x <= x0 + w && y >= y0 && y <= y0 + h; };
   for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) {
     const x = (i + 0.5) / u, y = (j + 0.5) / u;
-    let col = [185, 173, 244, 255];
+    let col = [143, 220, 190, 255];
     if (radius && !inRR(x, y, 0, 0, 64, 64, radius)) col = [0, 0, 0, 0];
     else {
-      const ink = [28, 34, 54, 255], lav = [185, 173, 244, 255];
+      const ink = [21, 32, 30, 255], lav = [143, 220, 190, 255];
       const body = inRR(x, y, 17, 28, 30, 22, 5);
       const d = Math.hypot(x - 32, y - 22);
       const shackle = y <= 28 && d >= 6.5 && d <= 11.5 && y <= 28.5;

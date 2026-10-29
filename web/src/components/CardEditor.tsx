@@ -95,7 +95,7 @@ export function CardEditor({ credential, devices, people, onClose, onSaved }: {
         <label className="field"><span>Persona</span>
           <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
             <option value={NONE}>— Sin asignar —</option>
-            <option value={NEW}>➕ Nueva persona…</option>
+            <option value={NEW}>+ Nueva persona…</option>
             {people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
           </select>
         </label>
